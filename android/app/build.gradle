@@ -1,0 +1,78 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.mini.app"
+    compileSdk rootProject.ext.compileSdkVersion
+
+    signingConfigs {
+        release {
+            storeFile file("mini-release.keystore")
+            storePassword "MiniAI2026Secure!"
+            keyAlias "mini-ai"
+            keyPassword "MiniAI2026Secure!"
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+
+    defaultConfig {
+        applicationId "com.mini.app"
+        minSdkVersion 26
+        targetSdkVersion 34
+        versionCode 1
+        versionName "1.0.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+        ndk { abiFilters "arm64-v8a" }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+            debuggable true
+            signingConfig signingConfigs.release
+            packagingOptions {
+                doNotStrip "**/*.so"
+            }
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            ndk { debugSymbolLevel 'FULL' }
+        }
+    }
+
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        disable 'ExpiredTargetSdkVersion'
+    }
+}
+
+repositories {
+    flatDir{ dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs' }
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.1.5'
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    implementation project(':capacitor-cordova-android-plugins')
+    implementation 'com.google.mediapipe:tasks-genai:0.10.14'
+}
+
+apply from: 'capacitor.build.gradle'

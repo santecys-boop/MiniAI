@@ -1,0 +1,15 @@
+rootProject.name = 'mini-native'
+
+include ':app'
+include ':capacitor-android'
+include ':capacitor-device'
+include ':capacitor-voice-recorder'
+
+project(':capacitor-android').projectDir = new File(rootProject.projectDir, '../node_modules/@capacitor/android/capacitor')
+project(':capacitor-device').projectDir = new File(rootProject.projectDir, '../node_modules/@capacitor/device/android')
+project(':capacitor-voice-recorder').projectDir = new File(rootProject.projectDir, '../node_modules/capacitor-voice-recorder/android')
+include ':capacitor-cordova-android-plugins'
+project(':capacitor-cordova-android-plugins').projectDir = new File(rootProject.projectDir, 'capacitor-cordova-android-plugins')
+
+include ':capacitor-app'
+project(':capacitor-app').projectDir = new File(rootProject.projectDir, '../node_modules/@capacitor/app/android')

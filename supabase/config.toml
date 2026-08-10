@@ -1,0 +1,27 @@
+project_id = "dejfubusyxdhuijvahox"
+
+[functions.generate-site]
+verify_jwt = false
+
+[functions.validate-site]
+verify_jwt = false
+
+[functions.publish-site]
+verify_jwt = false
+
+[functions.screenshot-site]
+verify_jwt = false
+
+[functions.agent-mode]
+verify_jwt = false
+
+[functions.view-site]
+verify_jwt = false
+
+[functions.agent-run]
+verify_jwt = false
+
+[functions.mini-api]
+verify_jwt = false
+
+

@@ -1,0 +1,12 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.mini.app',
+  appName: 'Mini',
+  webDir: 'dist',
+  android: {
+    allowMixedContent: true,
+  }
+};
+
+export default config;
