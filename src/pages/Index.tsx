@@ -12,7 +12,7 @@ import {
   Monitor, Tablet, Smartphone, Loader2, History, Camera, Wand2,
   Paperclip, Image as ImageIcon, X, FileText,
   Zap, Edit3, Trash2, Bot, Terminal as TermIcon,
-  ChevronLeft, ChevronRight, ShieldCheck, LogIn, LogOut, Tag,
+  ChevronLeft, ChevronRight, ChevronDown, ShieldCheck, LogIn, LogOut, Tag,
   KeyRound, Plus, Menu, Volume2, VolumeX, LayoutGrid,
   Layers, Globe2, CreditCard,
 } from "lucide-react";
