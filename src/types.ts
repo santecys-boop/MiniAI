@@ -42,6 +42,7 @@ export type Msg = {
   projectApiKey?: string;
   alternatives?: string[];
   currentAltIdx?: number;
+  thinkMode?: boolean;
 };
 
 export type LogEntry = {

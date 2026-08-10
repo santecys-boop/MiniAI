@@ -96,15 +96,16 @@ export function MessageItem({ message: m, isStreaming, onImageClick, onRegenerat
     );
   }
 
-  // ─── ASSISTANT MESSAGE ─── (Screenshot 3 & 4: left-aligned, no bubble, no avatar)
+  // ─── ASSISTANT MESSAGE ───
   const isCurrentlyThinking = isStreaming && !m.chat;
   const hasThoughts = !!m.plan;
+  const shouldShowThinking = m.thinkMode || hasThoughts;
 
   return (
     <div className="flex flex-col my-5 w-full max-w-3xl space-y-2.5 animate-fade-in">
 
-      {/* ── THINKING INDICATOR (Screenshot 4) ── */}
-      {(isCurrentlyThinking || hasThoughts || (thinkingDone && thinkSeconds > 0)) && (
+      {/* ── THINKING INDICATOR ── */}
+      {shouldShowThinking && (isCurrentlyThinking || hasThoughts || thinkingDone) && (
         <div className="space-y-1.5">
           <button
             onClick={() => setShowThought(p => !p)}

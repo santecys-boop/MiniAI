@@ -392,17 +392,47 @@ export default function Index() {
 
   async function loadHistory() {
     try {
-      let query = supabase.from("sites").select("*").order("created_at", { ascending: false }).limit(20);
       if (user?.id) {
-        query = query.eq("user_id", user.id);
+        const { data } = await supabase
+          .from("sites")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(30);
+        if (data) setHistoryList(data as SiteRow[]);
       } else {
-        query = query.is("user_id", null);
+        const local = localStorage.getItem("mini_ai_local_history");
+        if (local) {
+          try { setHistoryList(JSON.parse(local)); } catch { setHistoryList([]); }
+        } else {
+          setHistoryList([]);
+        }
       }
-      const { data } = await query;
-      if (data) setHistoryList(data as SiteRow[]);
     } catch (err) {
       console.error("loadHistory error:", err);
     }
+  }
+
+  function saveLocalHistory(promptText: string, codeText: string, typeText: string) {
+    const newItem: SiteRow = {
+      id: safeUUID(),
+      prompt: promptText,
+      code: codeText,
+      type: typeText,
+      model,
+      published_url: null,
+      screenshot_url: null,
+      created_at: new Date().toISOString(),
+      user_id: null
+    };
+    const local = localStorage.getItem("mini_ai_local_history");
+    let arr: SiteRow[] = [];
+    if (local) {
+      try { arr = JSON.parse(local); } catch { arr = []; }
+    }
+    const updated = [newItem, ...arr].slice(0, 30);
+    localStorage.setItem("mini_ai_local_history", JSON.stringify(updated));
+    setHistoryList(updated);
   }
 
   async function loadApiKeys() {
@@ -651,6 +681,8 @@ export default function Index() {
             savedSiteId = row.id;
             loadHistory();
           }
+        } else {
+          saveLocalHistory(`Görsel: ${promptToGen}`, `![Oluşturulan Görsel](${imgUrl})`, "chat");
         }
 
         setMessages(m => m.map(msg => {
@@ -1003,7 +1035,7 @@ export default function Index() {
       let savedSiteId: string | undefined = undefined;
       if (user?.id) {
         const { data: row } = await supabase.from("sites").insert({
-          prompt: input || "(sohbet)", 
+          prompt: textToSend || "(sohbet)", 
           code: parsed.code || finalChat || "(Boş)", 
           type: parsed.codeType || "chat", 
           model,
@@ -1014,6 +1046,8 @@ export default function Index() {
           savedSiteId = row.id;
           loadHistory(); 
         }
+      } else {
+        saveLocalHistory(textToSend || "(sohbet)", parsed.code || finalChat || "(Boş)", parsed.codeType || "chat");
       }
 
       if (parsed.code && parsed.codeType) {
@@ -1219,14 +1253,14 @@ export default function Index() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-700 dark:text-stone-300 font-medium text-[15px]">
-                  Mini AI Hızlı modu
+                  {model === "qwen-coder" ? "Uzman Kodlayıcı" : model === "grok" ? "Grok 2" : "Mini AI Hızlı"}
                   <ChevronDown className="w-4 h-4 text-stone-500" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48 bg-white dark:bg-[#212121] border-stone-200 dark:border-stone-800 rounded-xl p-1">
-                <DropdownMenuItem onClick={() => setModel("sambanova")} className="rounded-lg cursor-pointer">Mini AI Hızlı</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setModel("qwen-coder")} className="rounded-lg cursor-pointer">Uzman Kodlayıcı</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setModel("grok")} className="rounded-lg cursor-pointer">Grok 2</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setModel("sambanova"); toast.info("Mini AI Hızlı modu seçildi"); }} className="rounded-lg cursor-pointer">Mini AI Hızlı</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setModel("qwen-coder"); toast.info("Uzman Kodlayıcı modu seçildi"); }} className="rounded-lg cursor-pointer">Uzman Kodlayıcı</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setModel("grok"); toast.info("Grok 2 modu seçildi"); }} className="rounded-lg cursor-pointer">Grok 2</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

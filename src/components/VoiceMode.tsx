@@ -1274,12 +1274,9 @@ export default function VoiceMode({
         }
       }
     } catch {
-      /* Fallback to Google Translate MP3 URL below */
+      /* Fallback to WebSpeech */
     }
-    
-    // Google Translate TTS direct MP3 fallback (100% works everywhere)
-    const encoded = encodeURIComponent(text.slice(0, 190));
-    return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=tr&client=tw-ob`;
+    throw new Error("Cloud TTS Unavailable");
   }
 
   /** Bir Base64 / Audio URL'ini çal; bitince/hata olunca/iptal edilince resolve olur */
