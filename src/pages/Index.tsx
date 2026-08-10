@@ -1389,7 +1389,9 @@ export default function Index() {
               welcomeDone={welcomeDone}
               chatEndRef={chatEndRef}
               onImageClick={(url) => setPreviewImageUrl(url)}
-              onVideoClick={(url) => setPreviewVideoUrl(url)}
+              onPromptSelect={(promptText) => {
+                setInput(promptText);
+              }}
             />
           </ScrollArea>
 
