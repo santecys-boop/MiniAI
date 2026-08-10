@@ -1148,39 +1148,30 @@ export default function Index() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-slate-900" style={{ backgroundColor: "#faf7f5" }}>
-      <header className="relative z-20 sticky top-0">
-        <div className="flex items-center justify-between px-3 sm:px-5 h-14 gap-2">
-          <div className="flex items-center gap-2">
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-white dark:bg-[#212121] text-stone-900 dark:text-stone-100">
+      <header className="relative z-20 sticky top-0 bg-white/80 dark:bg-[#212121]/80 backdrop-blur-md">
+        <div className="flex items-center justify-between px-3 h-14">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setMenuOpen(true)}
-              className="flex items-center gap-2 rounded-full bg-white shadow-sm border border-stone-200 pl-3 pr-3.5 h-10 hover:bg-stone-50 transition relative"
+              className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-600 dark:text-stone-400"
               aria-label="Menü"
             >
-              <Menu className="w-4 h-4 text-stone-700" />
-              <span className="font-semibold text-stone-900 text-[15px] leading-none">Mini AI</span>
-              {historyList.length > 0 && <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-stone-400" />}
+              <Menu className="w-5 h-5" />
+            </button>
+            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-700 dark:text-stone-300 font-medium text-[15px]">
+              Mini AI Hızlı modu
+              <ChevronDown className="w-4 h-4 text-stone-500" />
             </button>
           </div>
-          <div className="flex items-center gap-2">
-
-            
-            <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100" title="Admin Paneli" onClick={() => setAdminPanelOpen(true)}>
-              <ShieldCheck className="w-5 h-5" />
-            </Button>
-            <button
-              onClick={toggleMute}
-              className="w-10 h-10 rounded-full bg-white shadow-sm border border-stone-200 flex items-center justify-center hover:bg-stone-50 transition"
-              aria-label={muted ? "Sesi aç" : "Sesi kapat"}
-            >
-              {muted ? <VolumeX className="w-5 h-5 text-stone-700" /> : <Volume2 className="w-5 h-5 text-stone-700" />}
-            </button>
+          <div className="flex items-center gap-1">
             <button
               onClick={resetAll}
-              className="w-10 h-10 rounded-full bg-white shadow-sm border border-stone-200 flex items-center justify-center hover:bg-stone-50 transition"
-              aria-label="Yeni sohbet"
+              className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-600 dark:text-stone-400"
+              title="Yeni sohbet"
             >
-              <Plus className="w-5 h-5 text-stone-700" />
+              <Plus className="w-5 h-5" />
             </button>
           </div>
         </div>
