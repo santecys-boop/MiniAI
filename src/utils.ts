@@ -126,12 +126,20 @@ export function parseMultiFileResponse(raw: string): { chat?: string; plan?: str
 export function parseAIResponse(raw: string): { chat?: string; plan?: string; code?: string; codeType?: "html" | "react"; projectFiles?: ProjectFile[] } {
   let text = raw.trim();
   
+  // Extract <think> or <thought> blocks naturally
+  let thinkPlan = "";
+  const thinkMatch = text.match(/<(?:think|thought)>([\s\S]*?)<\/(?:think|thought)>/i);
+  if (thinkMatch) {
+    thinkPlan = thinkMatch[1].trim();
+    text = text.replace(/<(?:think|thought)>[\s\S]*?<\/(?:think|thought)>/i, "").trim();
+  }
+  
   if (text.includes("[FILE:")) {
     const multi = parseMultiFileResponse(text);
     if (multi.files.length > 0) {
       return {
-        chat: multi.chat,
-        plan: multi.plan,
+        chat: multi.chat || text,
+        plan: multi.plan || thinkPlan,
         code: multi.mainHtml || multi.files[0].content,
         codeType: multi.mainHtml ? "html" : (multi.files[0].lang === "tsx" ? "react" : "html"),
         projectFiles: multi.files,
@@ -141,18 +149,22 @@ export function parseAIResponse(raw: string): { chat?: string; plan?: string; co
   
   if (text.includes("[CHAT]")) {
     text = text.replace(/^```[\w]*\s*\n?/i, "").replace(/\n?```\s*$/i, "").replace(/\[CHAT\]/gi, "").trim();
-    if (!text.includes("[CODE:")) return { chat: text };
+    if (!text.includes("[CODE:")) return { chat: text, plan: thinkPlan || undefined };
   }
+  
   const planMatch2 = text.match(/\[PLAN\]\s*([\s\S]*?)(?=\[CODE:|$)/i);
   const codeMatch = text.match(/\[CODE:(html|react)\]\s*([\s\S]*?)$/i);
+  
   if (codeMatch) {
     let code = codeMatch[2].trim();
     code = code.replace(/^```(?:html|tsx|jsx|typescript|javascript)?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
-    return { plan: planMatch2?.[1].trim(), code, codeType: codeMatch[1].toLowerCase() as "html" | "react" };
+    return { plan: planMatch2?.[1].trim() || thinkPlan || undefined, code, codeType: codeMatch[1].toLowerCase() as "html" | "react" };
   }
+  
   if (text.includes("<!DOCTYPE") || text.includes("<html")) {
     const m = text.match(/<!DOCTYPE[\s\S]*<\/html>/i);
-    return { code: m ? m[0] : text, codeType: "html" };
+    return { code: m ? m[0] : text, codeType: "html", plan: thinkPlan || undefined };
   }
-  return { chat: text };
+  
+  return { chat: text, plan: thinkPlan || undefined };
 }

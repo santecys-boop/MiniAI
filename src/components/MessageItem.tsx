@@ -10,9 +10,11 @@ export type MessageItemProps = {
   message: Msg;
   isStreaming?: boolean;
   onImageClick?: (url: string) => void;
+  onRegenerate?: () => void;
+  onChangeAlt?: (dir: number) => void;
 };
 
-export function MessageItem({ message: m, isStreaming, onImageClick }: MessageItemProps) {
+export function MessageItem({ message: m, isStreaming, onImageClick, onRegenerate, onChangeAlt }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState<boolean | null>(null);
   const [showThought, setShowThought] = useState(false);
@@ -56,13 +58,17 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
     }
   }, [m.plan, m.chat, thinkingDone, thinkSeconds]);
 
-  const mdImageMatch = m.chat ? m.chat.match(/!\[.*?\]\((.*?)\)/) : null;
+  const altIdx = m.currentAltIdx ?? 0;
+  const alternatives = m.alternatives && m.alternatives.length > 0 ? m.alternatives : [m.chat || ""];
+  const currentChat = alternatives[altIdx];
+
+  const mdImageMatch = currentChat ? currentChat.match(/!\[.*?\]\((.*?)\)/) : null;
   const imageUrl = mdImageMatch ? mdImageMatch[1] : m.attachments?.find(a => a.kind === "image")?.data;
-  const cleanChatText = m.chat ? m.chat.replace(/!\[.*?\]\(.*?\)/g, "").trim() : "";
+  const cleanChatText = currentChat ? currentChat.replace(/!\[.*?\]\(.*?\)/g, "").trim() : "";
 
   function copyText() {
-    if (m.chat) {
-      navigator.clipboard.writeText(m.chat);
+    if (currentChat) {
+      navigator.clipboard.writeText(currentChat);
       setCopied(true);
       toast.success("Kopyalandı");
       setTimeout(() => setCopied(false), 2000);
@@ -187,8 +193,8 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             </button>
             <button
               onClick={() => {
-                if (navigator.share && m.chat) {
-                  navigator.share({ text: m.chat });
+                if (navigator.share && currentChat) {
+                  navigator.share({ text: currentChat });
                 } else {
                   copyText();
                 }
@@ -198,9 +204,31 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             >
               <Share2 className="w-[17px] h-[17px]" />
             </button>
+
+            {/* Pagination for Alternatives */}
+            {alternatives.length > 1 && (
+              <div className="flex items-center gap-1.5 ml-2 text-[13px] font-medium text-stone-400">
+                <button
+                  onClick={() => onChangeAlt?.(-1)}
+                  disabled={altIdx === 0}
+                  className="p-0.5 rounded-md hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span>{altIdx + 1} / {alternatives.length}</span>
+                <button
+                  onClick={() => onChangeAlt?.(1)}
+                  disabled={altIdx === alternatives.length - 1}
+                  className="p-0.5 rounded-md hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           <button
+            onClick={onRegenerate}
             className="p-1.5 rounded-lg text-stone-400 dark:text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
             title="Yeniden Yanıtla"
           >

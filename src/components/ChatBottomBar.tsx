@@ -25,12 +25,15 @@ export type ChatBottomBarProps = {
   imageInputRef: React.RefObject<HTMLInputElement | null>;
   cameraInputRef: React.RefObject<HTMLInputElement | null>;
   openPricing: () => void;
+  thinkMode: boolean;
+  setThinkMode: (v: boolean) => void;
 };
 
 export function ChatBottomBar({
   input, setInput, pendingAttachments, setPendingAttachments, busy, setBusy,
   model, setModel, hasCode, send, toggleMic, attachOpen, setAttachOpen,
-  fileInputRef, imageInputRef, cameraInputRef, openPricing
+  fileInputRef, imageInputRef, cameraInputRef, openPricing,
+  thinkMode, setThinkMode
 }: ChatBottomBarProps) {
   return (
     <div className="w-full max-w-3xl mx-auto px-3 pb-3 pt-1 space-y-2">
@@ -69,7 +72,13 @@ export function ChatBottomBar({
           <div className="flex items-center gap-1">
             {/* Düşün button */}
             <button
-              className="h-8 px-3 rounded-full border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-xs font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700 flex items-center gap-1.5 transition-all"
+              type="button"
+              onClick={(e) => { e.preventDefault(); setThinkMode(!thinkMode); }}
+              className={`h-8 px-3 rounded-full border text-xs font-medium flex items-center gap-1.5 transition-all ${
+                thinkMode 
+                  ? "bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 shadow-sm" 
+                  : "bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700"
+              }`}
             >
               <Atom className="w-3.5 h-3.5" />
               <span>Düşün</span>

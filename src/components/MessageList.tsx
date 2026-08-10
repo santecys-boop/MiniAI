@@ -9,9 +9,12 @@ export type MessageListProps = {
   welcomeDone: boolean;
   chatEndRef: React.RefObject<HTMLDivElement | null>;
   onImageClick?: (url: string) => void;
+  onRegenerate?: (index: number) => void;
+  onChangeAlt?: (index: number, dir: number) => void;
+  onPromptSelect?: (prompt: string) => void;
 };
 
-export function MessageList({ messages, isLoading, welcomeText, welcomeDone, chatEndRef, onImageClick, onPromptSelect }: MessageListProps & { onPromptSelect?: (prompt: string) => void }) {
+export function MessageList({ messages, isLoading, welcomeText, welcomeDone, chatEndRef, onImageClick, onRegenerate, onChangeAlt, onPromptSelect }: MessageListProps) {
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[65vh] px-4 select-none max-w-3xl mx-auto space-y-8 animate-fade-in">
@@ -49,7 +52,14 @@ export function MessageList({ messages, isLoading, welcomeText, welcomeDone, cha
   return (
     <div className="space-y-4 max-w-3xl mx-auto px-2">
       {messages.map((m, i) => (
-        <MessageItem key={i} message={m} isStreaming={!!isLoading && i === messages.length - 1} onImageClick={onImageClick} />
+        <MessageItem
+          key={i}
+          message={m}
+          isStreaming={!!isLoading && i === messages.length - 1}
+          onImageClick={onImageClick}
+          onRegenerate={() => onRegenerate?.(i)}
+          onChangeAlt={(dir) => onChangeAlt?.(i, dir)}
+        />
       ))}
       <div ref={chatEndRef} />
     </div>

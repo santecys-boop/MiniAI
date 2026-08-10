@@ -17,6 +17,7 @@ import {
   Layers, Globe2, CreditCard,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { getCredits, spendCredit, isUnlimited, setUnlimited } from "@/lib/credits";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -217,6 +218,7 @@ export default function Index() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState("sambanova");
+  const [thinkMode, setThinkMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [tab, setTab] = useState("preview");
@@ -581,8 +583,21 @@ export default function Index() {
     e.target.value = "";
   }
 
-  async function send(opts?: { fix?: boolean; forceImage?: boolean }) {
-    if (!input.trim() && pendingAttachments.length === 0) return;
+  async function send(opts?: { fix?: boolean; forceImage?: boolean; regenerateIndex?: number }) {
+    let textToSend = input;
+    const isRegenerate = typeof opts?.regenerateIndex === "number";
+    
+    if (isRegenerate) {
+      // Find the user message right before this assistant message
+      const idx = opts.regenerateIndex!;
+      const userMsg = messages.slice(0, idx).reverse().find(m => m.role === "user");
+      if (userMsg?.chat) {
+        textToSend = userMsg.chat;
+      }
+      setMessages(prev => prev.slice(0, idx)); // truncate from the regenerating assistant message
+    }
+
+    if (!textToSend.trim() && pendingAttachments.length === 0) return;
     const isFix = !!opts?.fix;
     const isImageOnly = !!opts?.forceImage;
     if (isFix && !code) {
@@ -600,9 +615,11 @@ export default function Index() {
     setBusy(true);
 
     if (isImageOnly) {
-      const userMsg: Msg = { role: "user", chat: `🎨 Görsel Üret: ${input}`, attachments: pendingAttachments };
-      setMessages(m => [...m, userMsg]);
-      log("info", `📤 🎨 Görsel Üret: ${input.slice(0, 60)}`);
+      if (!isRegenerate) {
+        const userMsg: Msg = { role: "user", chat: `🎨 Görsel Üret: ${textToSend}`, attachments: pendingAttachments };
+        setMessages(m => [...m, userMsg]);
+      }
+      log("info", `📤 🎨 Görsel Üret: ${textToSend.slice(0, 60)}`);
       
       const newMsg: Msg = {
         role: "assistant",
@@ -611,9 +628,11 @@ export default function Index() {
       setMessages(m => [...m, newMsg]);
       log("ai", "🎨 Görsel üretimi başlatılıyor...");
 
-      const promptToGen = input;
-      setInput("");
-      setPendingAttachments([]);
+      const promptToGen = textToSend;
+      if (!isRegenerate) {
+        setInput("");
+        setPendingAttachments([]);
+      }
 
       try {
         const { generateImageWithStableHorde } = await import("../lib/stableHordeService");
@@ -672,9 +691,23 @@ export default function Index() {
     const wantsFileEdit = !isFix && /\b(düzelt|düzenle|değiştir|güncelle|ekle|kaldır|sil|çevir|refactor|fix|edit|update|değistir|dosyay[ıi])\b/.test(lower);
     const shouldUseFileEdit = !isFix && !!uploadedFile && wantsFileEdit;
 
-    const userMsg: Msg = { role: "user", chat: isFix ? `🔧 Düzelt: ${input}` : isImageOnly ? `🎨 Görsel Üret: ${input}` : input, attachments: pendingAttachments };
-    setMessages(m => [...m, userMsg]);
-    log("info", `📤 ${isFix ? "🔧 Düzeltme: " : isImageOnly ? "🎨 Görsel Üret: " : ""}${input.slice(0, 60) || "(sadece ek)"}`);
+    if (!isRegenerate) {
+      const userMsg: Msg = { role: "user", chat: textToSend, attachments: pendingAttachments };
+      setMessages(m => [...m, userMsg]);
+    }
+    
+    log("info", `📤 Mesaj gönderildi: ${textToSend.slice(0, 60)}...`);
+
+    const assistantPlaceholder: Msg = {
+      role: "assistant",
+      plan: thinkMode ? "Düşünce süreci başlatılıyor..." : "",
+    };
+    setMessages(m => [...m, assistantPlaceholder]);
+    
+    if (!isRegenerate) {
+      setInput("");
+      setPendingAttachments([]);
+    }
     log("ai", isImageOnly ? "🎨 Görsel tasarlanıyor..." : shouldUseE2B ? "🤖 E2B gerçek sandbox + Mini AI ajan başlıyor..." : useAgent ? "🤖 Ajan: 3 model paralel çalışıyor..." : "🤖 Mini AI düşünüyor...");
 
     const aiHistory = messages.filter(m => m.chat || m.code).map(m => ({
@@ -685,8 +718,7 @@ export default function Index() {
 
     try {
       if (shouldUseFileEdit && uploadedFile) {
-        const placeholder: Msg = { role: "assistant", chat: "🤖 E2B sandbox açılıyor — dosyan yükleniyor...", autoEvents: [], autoUrl: undefined };
-        setMessages(m => [...m, placeholder]);
+        setMessages(m => m.map(msg => msg === assistantPlaceholder ? { ...msg, chat: "🤖 E2B sandbox açılıyor — dosyan yükleniyor...", autoEvents: [] } : msg));
         const isZip = /\.zip$/i.test(uploadedFile.name);
         const fileBase64 = isZip
           ? uploadedFile.data.split(",")[1] || ""
@@ -728,7 +760,7 @@ export default function Index() {
                 downloadUrl = `data:application/zip;base64,${ev.fileBase64}`;
               }
               const snap = [...events];
-              setMessages(m => m.map(msg => msg === placeholder ? {
+              setMessages(m => m.map(msg => msg === assistantPlaceholder ? {
                 ...msg, autoEvents: snap, autoUrl: downloadUrl, downloadName,
                 chat: downloadUrl ? `✅ Hazır — ${downloadName}` : "🤖 Çalışıyor...",
               } : msg));
@@ -742,8 +774,7 @@ export default function Index() {
 
       if (shouldUseE2B) {
         const promptCopy = input;
-        const placeholder: Msg = { role: "assistant", chat: "🤖 E2B sandbox başlatılıyor...", autoEvents: [], autoUrl: undefined };
-        setMessages(m => [...m, placeholder]);
+        setMessages(m => m.map(msg => msg === assistantPlaceholder ? { ...msg, chat: "🤖 E2B sandbox başlatılıyor...", autoEvents: [] } : msg));
         const res = await fetch(`${FN_BASE}/agent-run`, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: ANON, Authorization: `Bearer ${ANON}` },
@@ -773,7 +804,7 @@ export default function Index() {
               if (ev.type === "error") log("error", `⚠ ${ev.message}`);
               if (ev.type === "done") log("success", `✓ Otomasyon tamamlandı`);
               const snap = [...events]; const urlSnap = liveUrl;
-              setMessages(m => m.map(msg => msg === placeholder ? { ...msg, autoEvents: snap, autoUrl: urlSnap, chat: urlSnap ? `✅ Hazır — ${urlSnap}` : "🤖 Çalışıyor..." } : msg));
+              setMessages(m => m.map(msg => msg === assistantPlaceholder ? { ...msg, autoEvents: snap, autoUrl: urlSnap, chat: urlSnap ? `✅ Hazır — ${urlSnap}` : "🤖 Çalışıyor..." } : msg));
             } catch { /* empty */ }
           }
         }
@@ -808,11 +839,16 @@ export default function Index() {
         enrichedSystemPrompt += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Kullanıcı bu mesajı özel 'Üret' (Görsel Üretim) butonuyla gönderdi. Bu bir görsel isteğidir! Kesinlikle kod yazma, kod kutusu açma veya [FILE:...] bloğu ekleme! KESİNLİKLE cevabının en başına [IMAGE_GEN] etiketini koyup İngilizce prompt yazmalısın. Örnek: [IMAGE_GEN]yazılacak prompt[/IMAGE_GEN]";
       }
 
+      let finalPromptToAI = textToSend;
+      if (thinkMode) {
+        finalPromptToAI += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Düşünme modu aktif! Lütfen cevap vermeden önce <thought> etiketleri arasında (örn: <thought>... adım adım plan...</thought>) düşünce sürecini detaylıca paylaş, ardından gerçek cevabını ver. <thought> etiketi açılmazsa sistem çöker.";
+      }
+
       if (useAgent) {
         const r = await fetch(`${FN_BASE}/agent-mode`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({ prompt: input, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
+          body: JSON.stringify({ prompt: finalPromptToAI, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
         });
         const data = await r.json();
         if (data.error) throw new Error(data.error);
@@ -827,12 +863,12 @@ export default function Index() {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
           body: JSON.stringify({
-            prompt: input, history: aiHistory, images: imgs,
+            prompt: finalPromptToAI, history: aiHistory, images: imgs,
             attachedFile: file ? { name: file.name, content: file.data } : null,
             preferredProvider: model,
             systemPrompt: enrichedSystemPrompt,
             onlineCompilerKey: ONLINE_COMPILER_API_KEY,
-            ...(isFix ? { fixError: input, currentCode: code } : {}),
+            ...(isFix ? { fixError: finalPromptToAI, currentCode: code } : {}),
           }),
         });
         const data = await resp.json();
@@ -894,13 +930,19 @@ export default function Index() {
           linuxCommands: [/python/i.test(lower) ? "python3 main.py" : /npm|node/i.test(lower) ? "npm install && npm start" : /apk/i.test(lower) ? "./gradlew assembleRelease" : "bash compile_and_run.sh"] 
         } : {}) 
       };
-      setMessages(m => [...m, newMsg]);
+
+      setMessages(m => m.map(msg => msg === assistantPlaceholder ? {
+        ...msg,
+        ...finalMsg,
+        alternatives: isRegenerate && msg.alternatives ? [...msg.alternatives, finalMsg.chat || ""] : [finalMsg.chat || ""],
+        currentAltIdx: isRegenerate && msg.alternatives ? msg.alternatives.length : 0
+      } : msg));
 
       if (aiImagePrompt) {
          log("ai", `🎨 Yapay Zeka Niyeti Algılandı: Görsel üretimi başlatılıyor...`);
          generateImageWithStableHorde(aiImagePrompt).then(imgUrl => {
             setMessages(m => m.map(msg => {
-                if (msg === newMsg) {
+                if (msg === assistantPlaceholder) {
                     return {
                         ...msg,
                         chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n![Oluşturulan Görsel](${imgUrl})` : `![Oluşturulan Görsel](${imgUrl})`,
@@ -912,7 +954,7 @@ export default function Index() {
             log("success", "✅ Görsel üretimi tamamlandı");
          }).catch(imgErr => {
             setMessages(m => m.map(msg => {
-                if (msg === newMsg) {
+                if (msg === assistantPlaceholder) {
                     return {
                         ...msg,
                         chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n⚠️ Görsel oluşturulamadı: ${imgErr.message}` : `⚠️ Görsel oluşturulamadı: ${imgErr.message}`
@@ -931,7 +973,7 @@ export default function Index() {
         log("ai", `⚡ AI Canlı Yayın: Evrensel Linux Sandbox API (${ONLINE_COMPILER_API_KEY.slice(0, 8)}...) üzerinden Build & Run akışı devrede...`);
         
         setTimeout(() => {
-          setMessages(m => m.map(msg => msg === newMsg ? { ...msg, compileStatus: "running" } : msg));
+          setMessages(m => m.map(msg => msg === assistantPlaceholder ? { ...msg, compileStatus: "running" } : msg));
           log("info", "$ AI motoru kod öbeğini ve varlıkları Build & Run için terminale yazıyor...");
         }, 1200);
 
@@ -946,7 +988,7 @@ export default function Index() {
             ? `root@mini-ai-linux:~# tar -czvf project_bundle.zip ./*\n[SUCCESS] Archived project bundle cleanly (Compression: 84%)\n>> ZIP paketi alt arayüzden indirilebilir.`
             : `root@mini-ai-linux:~# build_and_run --auto-trigger\n[SYSTEM] Linux Virtual Sandbox Engine initialized via API Key (54a81b...)\n[EXEC] Process finished cleanly with return code 0.\n>> Canlı yayın arayüzü ve çalışan çıktı yukarıda aktif edildi!`;
 
-          setMessages(m => m.map(msg => msg === newMsg ? {
+          setMessages(m => m.map(msg => msg === assistantPlaceholder ? {
             ...msg,
             compileStatus: "success",
             isCompiling: false,
@@ -1147,6 +1189,21 @@ export default function Index() {
     localStorage.setItem("mini_muted", nv ? "1" : "0");
   }
 
+  function handleRegenerate(index: number) {
+    send({ regenerateIndex: index });
+  }
+
+  function handleChangeAlt(index: number, dir: number) {
+    setMessages(m => m.map((msg, i) => {
+      if (i === index && msg.alternatives) {
+        const altIdx = msg.currentAltIdx ?? 0;
+        const newIdx = Math.max(0, Math.min(msg.alternatives.length - 1, altIdx + dir));
+        return { ...msg, currentAltIdx: newIdx };
+      }
+      return msg;
+    }));
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-white dark:bg-[#212121] text-stone-900 dark:text-stone-100">
       <header className="relative z-20 sticky top-0 bg-white/80 dark:bg-[#212121]/80 backdrop-blur-md">
@@ -1159,10 +1216,19 @@ export default function Index() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-700 dark:text-stone-300 font-medium text-[15px]">
-              Mini AI Hızlı modu
-              <ChevronDown className="w-4 h-4 text-stone-500" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-700 dark:text-stone-300 font-medium text-[15px]">
+                  Mini AI Hızlı modu
+                  <ChevronDown className="w-4 h-4 text-stone-500" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48 bg-white dark:bg-[#212121] border-stone-200 dark:border-stone-800 rounded-xl p-1">
+                <DropdownMenuItem onClick={() => setModel("sambanova")} className="rounded-lg cursor-pointer">Mini AI Hızlı</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setModel("qwen-coder")} className="rounded-lg cursor-pointer">Uzman Kodlayıcı</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setModel("grok")} className="rounded-lg cursor-pointer">Grok 2</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -1379,6 +1445,8 @@ export default function Index() {
               welcomeDone={welcomeDone}
               chatEndRef={chatEndRef}
               onImageClick={(url) => setPreviewImageUrl(url)}
+              onRegenerate={handleRegenerate}
+              onChangeAlt={handleChangeAlt}
               onPromptSelect={(promptText) => {
                 setInput(promptText);
               }}
@@ -1403,6 +1471,8 @@ export default function Index() {
             imageInputRef={imageInputRef}
             cameraInputRef={cameraInputRef}
             openPricing={() => setPricingOpen(true)}
+            thinkMode={thinkMode}
+            setThinkMode={setThinkMode}
           />
         </aside>
       </div>
