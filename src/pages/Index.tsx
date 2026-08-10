@@ -1148,7 +1148,6 @@ export default function Index() {
   }
 
   return (
-  return (
     <div className="relative min-h-screen overflow-hidden bg-white dark:bg-[#212121] text-stone-900 dark:text-stone-100">
       <header className="relative z-20 sticky top-0 bg-white/80 dark:bg-[#212121]/80 backdrop-blur-md">
         <div className="flex items-center justify-between px-3 h-14">
@@ -1413,8 +1412,8 @@ export default function Index() {
       <input ref={cameraInputRef} type="file" className="hidden" accept="image/*" capture="environment" onChange={handleImagePick} />
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left" className="w-80 p-0 flex flex-col" style={{ backgroundColor: "#faf7f5" }}>
-          <SheetHeader className="p-4 border-b border-stone-200">
+        <SheetContent side="left" className="w-80 p-0 flex flex-col bg-white dark:bg-[#171717]">
+          <SheetHeader className="p-4 border-b border-stone-200 dark:border-stone-800">
             <SheetTitle className="text-stone-900 flex items-center gap-2">
               <span className="font-bold text-lg">Mini AI</span>
               <span className="text-xs text-stone-400 font-normal">Geçmiş & Ayarlar</span>
@@ -1496,7 +1495,7 @@ export default function Index() {
       </Sheet>
 
       <Dialog open={generatorOpen} onOpenChange={setGeneratorOpen}>
-        <DialogContent className="rounded-2xl max-w-lg p-6 max-h-[85vh] flex flex-col" style={{ backgroundColor: "#faf7f5" }}>
+        <DialogContent className="rounded-2xl max-w-lg p-6 max-h-[85vh] flex flex-col bg-white dark:bg-[#212121]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-stone-900 font-bold text-lg">
               <Bot className="w-5 h-5 text-emerald-600 animate-pulse" /> AI Akıllı Şifre & Lisans Havuzu (Otonom)
@@ -1535,7 +1534,7 @@ export default function Index() {
       </Dialog>
 
       <Dialog open={promoOpen} onOpenChange={setPromoOpen}>
-        <DialogContent className="rounded-2xl max-w-sm" style={{ backgroundColor: "#faf7f5" }}>
+        <DialogContent className="rounded-2xl max-w-sm bg-white dark:bg-[#212121]">
           <DialogHeader>
             <DialogTitle>Promo Kodu</DialogTitle>
           </DialogHeader>
@@ -1547,7 +1546,7 @@ export default function Index() {
       </Dialog>
 
       <Dialog open={apiKeysOpen} onOpenChange={setApiKeysOpen}>
-        <DialogContent className="rounded-2xl max-w-md" style={{ backgroundColor: "#faf7f5" }}>
+        <DialogContent className="rounded-2xl max-w-md p-6 bg-white dark:bg-[#212121]">
           <DialogHeader>
             <DialogTitle>API Anahtarları</DialogTitle>
           </DialogHeader>
@@ -1590,7 +1589,7 @@ export default function Index() {
       {voiceOpen && <VoiceMode open={true} onClose={() => setVoiceOpen(false)} />}
 
       <Dialog open={onboardOpen} onOpenChange={setOnboardOpen}>
-        <DialogContent className="rounded-2xl max-w-sm" style={{ backgroundColor: "#faf7f5" }}>
+        <DialogContent className="rounded-3xl max-w-sm p-6 [&>button]:hidden bg-white dark:bg-[#212121]">
           <DialogHeader>
             <DialogTitle>
               {onboardStep === 0 ? "Mini AI'ye hoş geldin 👋" : onboardStep === 1 ? "Ne yapmak istiyorsun?" : "Nasıl bir stil tercih edersin?"}
@@ -1637,7 +1636,7 @@ export default function Index() {
       </Dialog>
 
       <Dialog open={smsOpen} onOpenChange={setSmsOpen}>
-        <DialogContent className="rounded-2xl max-w-sm" style={{ backgroundColor: "#faf7f5" }}>
+        <DialogContent className="rounded-2xl max-w-sm bg-white dark:bg-[#212121]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-stone-900 font-bold">
               <Smartphone className="w-5 h-5 text-emerald-600" />

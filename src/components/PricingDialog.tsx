@@ -16,7 +16,7 @@ export type PricingDialogProps = {
 export function PricingDialog({ open, onOpenChange }: PricingDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-3xl max-w-4xl p-6 overflow-auto max-h-[90vh]" style={{ backgroundColor: "#faf7f5" }}>
+      <DialogContent className="rounded-3xl max-w-4xl p-6 overflow-auto max-h-[90vh] bg-white dark:bg-[#212121]">
         <DialogHeader className="text-center pb-2">
           <DialogTitle className="text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight flex items-center justify-center gap-2">
             <Sparkles className="w-6 h-6 text-amber-500" /> Mini AI Planınızı Yükseltin

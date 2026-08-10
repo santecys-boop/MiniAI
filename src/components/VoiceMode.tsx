@@ -1526,7 +1526,7 @@ export default function VoiceMode({
   const hasText = textInput.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden select-none vm-root" style={{ backgroundColor: "#faf7f5" }}>
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden select-none vm-root bg-white dark:bg-[#212121]">
       {/* ── Global animasyon tanımları ── */}
       <style>{`
         .vm-root { animation: vmFade .35s ease; }
