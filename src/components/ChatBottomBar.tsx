@@ -45,7 +45,7 @@ export function ChatBottomBar({
   const handlePromptSubmit = (value: string, meta: { model: string; effort: string; attachments: File[] }) => {
     if (meta.model) handleModelSelect(meta.model);
     if (!busy) {
-      send();
+      send({ effort: meta.effort });
     }
   };
 

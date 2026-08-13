@@ -581,7 +581,7 @@ export default function Index() {
     e.target.value = "";
   }
 
-  async function send(opts?: { fix?: boolean; forceImage?: boolean }) {
+  async function send(opts?: { fix?: boolean; forceImage?: boolean; effort?: string }) {
     if (!input.trim() && pendingAttachments.length === 0) return;
     const isFix = !!opts?.fix;
     const isImageOnly = !!opts?.forceImage;
@@ -877,6 +877,7 @@ export default function Index() {
         role: "assistant", 
         ...parsed, 
         chat: finalChat,
+        effort: opts?.effort || "Medium",
         agentCandidates: allCandidates,
         ...(parsed.code && parsed.codeType === "html" ? { code: injectAIBridge(parsed.code) } : {}),
         projectFiles: processedFiles,

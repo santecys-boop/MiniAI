@@ -4,6 +4,7 @@ import {
   Zap, Globe, Download, ImageIcon, FileText, Loader2, Play, Video
 } from "lucide-react";
 import { toast } from "sonner";
+import { ThinkingReasoning } from "@/components/ui/thinking-reasoning";
 import { Msg } from "../types";
 import { ONLINE_COMPILER_API_KEY } from "../constants";
 import { injectAIBridge } from "../utils";
@@ -97,6 +98,8 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
       </div>
       
       <div className="flex-1 space-y-3 text-sm font-sans min-w-0">
+        <ThinkingReasoning effort={m.effort || "Medium"} plan={m.plan} isStreaming={isStreaming} />
+
         {m.attachments && m.attachments.length > 0 && !imageUrl && (
           <div className="flex flex-wrap gap-1.5">
             {m.attachments.map((a, j) => (
