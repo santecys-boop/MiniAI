@@ -12,12 +12,11 @@ import {
   Monitor, Tablet, Smartphone, Loader2, History, Camera, Wand2,
   Paperclip, Image as ImageIcon, X, FileText,
   Zap, Edit3, Trash2, Bot, Terminal as TermIcon,
-  ChevronLeft, ChevronRight, ChevronDown, ShieldCheck, LogIn, LogOut, Tag,
+  ChevronLeft, ChevronRight, ShieldCheck, LogIn, LogOut, Tag,
   KeyRound, Plus, Menu, Volume2, VolumeX, LayoutGrid,
   Layers, Globe2, CreditCard,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { getCredits, spendCredit, isUnlimited, setUnlimited } from "@/lib/credits";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -218,7 +217,6 @@ export default function Index() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState("sambanova");
-  const [thinkMode, setThinkMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [tab, setTab] = useState("preview");
@@ -392,47 +390,17 @@ export default function Index() {
 
   async function loadHistory() {
     try {
+      let query = supabase.from("sites").select("*").order("created_at", { ascending: false }).limit(20);
       if (user?.id) {
-        const { data } = await supabase
-          .from("sites")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(30);
-        if (data) setHistoryList(data as SiteRow[]);
+        query = query.eq("user_id", user.id);
       } else {
-        const local = localStorage.getItem("mini_ai_local_history");
-        if (local) {
-          try { setHistoryList(JSON.parse(local)); } catch { setHistoryList([]); }
-        } else {
-          setHistoryList([]);
-        }
+        query = query.is("user_id", null);
       }
+      const { data } = await query;
+      if (data) setHistoryList(data as SiteRow[]);
     } catch (err) {
       console.error("loadHistory error:", err);
     }
-  }
-
-  function saveLocalHistory(promptText: string, codeText: string, typeText: string) {
-    const newItem: SiteRow = {
-      id: safeUUID(),
-      prompt: promptText,
-      code: codeText,
-      type: typeText,
-      model,
-      published_url: null,
-      screenshot_url: null,
-      created_at: new Date().toISOString(),
-      user_id: null
-    };
-    const local = localStorage.getItem("mini_ai_local_history");
-    let arr: SiteRow[] = [];
-    if (local) {
-      try { arr = JSON.parse(local); } catch { arr = []; }
-    }
-    const updated = [newItem, ...arr].slice(0, 30);
-    localStorage.setItem("mini_ai_local_history", JSON.stringify(updated));
-    setHistoryList(updated);
   }
 
   async function loadApiKeys() {
@@ -613,21 +581,8 @@ export default function Index() {
     e.target.value = "";
   }
 
-  async function send(opts?: { fix?: boolean; forceImage?: boolean; regenerateIndex?: number }) {
-    let textToSend = input;
-    const isRegenerate = typeof opts?.regenerateIndex === "number";
-    
-    if (isRegenerate) {
-      // Find the user message right before this assistant message
-      const idx = opts.regenerateIndex!;
-      const userMsg = messages.slice(0, idx).reverse().find(m => m.role === "user");
-      if (userMsg?.chat) {
-        textToSend = userMsg.chat;
-      }
-      setMessages(prev => prev.slice(0, idx)); // truncate from the regenerating assistant message
-    }
-
-    if (!textToSend.trim() && pendingAttachments.length === 0) return;
+  async function send(opts?: { fix?: boolean; forceImage?: boolean }) {
+    if (!input.trim() && pendingAttachments.length === 0) return;
     const isFix = !!opts?.fix;
     const isImageOnly = !!opts?.forceImage;
     if (isFix && !code) {
@@ -645,11 +600,9 @@ export default function Index() {
     setBusy(true);
 
     if (isImageOnly) {
-      if (!isRegenerate) {
-        const userMsg: Msg = { role: "user", chat: `🎨 Görsel Üret: ${textToSend}`, attachments: pendingAttachments };
-        setMessages(m => [...m, userMsg]);
-      }
-      log("info", `📤 🎨 Görsel Üret: ${textToSend.slice(0, 60)}`);
+      const userMsg: Msg = { role: "user", chat: `🎨 Görsel Üret: ${input}`, attachments: pendingAttachments };
+      setMessages(m => [...m, userMsg]);
+      log("info", `📤 🎨 Görsel Üret: ${input.slice(0, 60)}`);
       
       const newMsg: Msg = {
         role: "assistant",
@@ -658,11 +611,9 @@ export default function Index() {
       setMessages(m => [...m, newMsg]);
       log("ai", "🎨 Görsel üretimi başlatılıyor...");
 
-      const promptToGen = textToSend;
-      if (!isRegenerate) {
-        setInput("");
-        setPendingAttachments([]);
-      }
+      const promptToGen = input;
+      setInput("");
+      setPendingAttachments([]);
 
       try {
         const { generateImageWithStableHorde } = await import("../lib/stableHordeService");
@@ -681,8 +632,6 @@ export default function Index() {
             savedSiteId = row.id;
             loadHistory();
           }
-        } else {
-          saveLocalHistory(`Görsel: ${promptToGen}`, `![Oluşturulan Görsel](${imgUrl})`, "chat");
         }
 
         setMessages(m => m.map(msg => {
@@ -723,23 +672,9 @@ export default function Index() {
     const wantsFileEdit = !isFix && /\b(düzelt|düzenle|değiştir|güncelle|ekle|kaldır|sil|çevir|refactor|fix|edit|update|değistir|dosyay[ıi])\b/.test(lower);
     const shouldUseFileEdit = !isFix && !!uploadedFile && wantsFileEdit;
 
-    if (!isRegenerate) {
-      const userMsg: Msg = { role: "user", chat: textToSend, attachments: pendingAttachments };
-      setMessages(m => [...m, userMsg]);
-    }
-    
-    log("info", `📤 Mesaj gönderildi: ${textToSend.slice(0, 60)}...`);
-
-    const assistantPlaceholder: Msg = {
-      role: "assistant",
-      plan: thinkMode ? "Düşünce süreci başlatılıyor..." : "",
-    };
-    setMessages(m => [...m, assistantPlaceholder]);
-    
-    if (!isRegenerate) {
-      setInput("");
-      setPendingAttachments([]);
-    }
+    const userMsg: Msg = { role: "user", chat: isFix ? `🔧 Düzelt: ${input}` : isImageOnly ? `🎨 Görsel Üret: ${input}` : input, attachments: pendingAttachments };
+    setMessages(m => [...m, userMsg]);
+    log("info", `📤 ${isFix ? "🔧 Düzeltme: " : isImageOnly ? "🎨 Görsel Üret: " : ""}${input.slice(0, 60) || "(sadece ek)"}`);
     log("ai", isImageOnly ? "🎨 Görsel tasarlanıyor..." : shouldUseE2B ? "🤖 E2B gerçek sandbox + Mini AI ajan başlıyor..." : useAgent ? "🤖 Ajan: 3 model paralel çalışıyor..." : "🤖 Mini AI düşünüyor...");
 
     const aiHistory = messages.filter(m => m.chat || m.code).map(m => ({
@@ -750,7 +685,8 @@ export default function Index() {
 
     try {
       if (shouldUseFileEdit && uploadedFile) {
-        setMessages(m => m.map(msg => msg === assistantPlaceholder ? { ...msg, chat: "🤖 E2B sandbox açılıyor — dosyan yükleniyor...", autoEvents: [] } : msg));
+        const placeholder: Msg = { role: "assistant", chat: "🤖 E2B sandbox açılıyor — dosyan yükleniyor...", autoEvents: [], autoUrl: undefined };
+        setMessages(m => [...m, placeholder]);
         const isZip = /\.zip$/i.test(uploadedFile.name);
         const fileBase64 = isZip
           ? uploadedFile.data.split(",")[1] || ""
@@ -792,7 +728,7 @@ export default function Index() {
                 downloadUrl = `data:application/zip;base64,${ev.fileBase64}`;
               }
               const snap = [...events];
-              setMessages(m => m.map(msg => msg === assistantPlaceholder ? {
+              setMessages(m => m.map(msg => msg === placeholder ? {
                 ...msg, autoEvents: snap, autoUrl: downloadUrl, downloadName,
                 chat: downloadUrl ? `✅ Hazır — ${downloadName}` : "🤖 Çalışıyor...",
               } : msg));
@@ -806,7 +742,8 @@ export default function Index() {
 
       if (shouldUseE2B) {
         const promptCopy = input;
-        setMessages(m => m.map(msg => msg === assistantPlaceholder ? { ...msg, chat: "🤖 E2B sandbox başlatılıyor...", autoEvents: [] } : msg));
+        const placeholder: Msg = { role: "assistant", chat: "🤖 E2B sandbox başlatılıyor...", autoEvents: [], autoUrl: undefined };
+        setMessages(m => [...m, placeholder]);
         const res = await fetch(`${FN_BASE}/agent-run`, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: ANON, Authorization: `Bearer ${ANON}` },
@@ -836,7 +773,7 @@ export default function Index() {
               if (ev.type === "error") log("error", `⚠ ${ev.message}`);
               if (ev.type === "done") log("success", `✓ Otomasyon tamamlandı`);
               const snap = [...events]; const urlSnap = liveUrl;
-              setMessages(m => m.map(msg => msg === assistantPlaceholder ? { ...msg, autoEvents: snap, autoUrl: urlSnap, chat: urlSnap ? `✅ Hazır — ${urlSnap}` : "🤖 Çalışıyor..." } : msg));
+              setMessages(m => m.map(msg => msg === placeholder ? { ...msg, autoEvents: snap, autoUrl: urlSnap, chat: urlSnap ? `✅ Hazır — ${urlSnap}` : "🤖 Çalışıyor..." } : msg));
             } catch { /* empty */ }
           }
         }
@@ -871,16 +808,11 @@ export default function Index() {
         enrichedSystemPrompt += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Kullanıcı bu mesajı özel 'Üret' (Görsel Üretim) butonuyla gönderdi. Bu bir görsel isteğidir! Kesinlikle kod yazma, kod kutusu açma veya [FILE:...] bloğu ekleme! KESİNLİKLE cevabının en başına [IMAGE_GEN] etiketini koyup İngilizce prompt yazmalısın. Örnek: [IMAGE_GEN]yazılacak prompt[/IMAGE_GEN]";
       }
 
-      let finalPromptToAI = textToSend;
-      if (thinkMode) {
-        finalPromptToAI += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Düşünme modu aktif! Lütfen cevap vermeden önce <thought> etiketleri arasında (örn: <thought>... adım adım plan...</thought>) düşünce sürecini detaylıca paylaş, ardından gerçek cevabını ver. <thought> etiketi açılmazsa sistem çöker.";
-      }
-
       if (useAgent) {
         const r = await fetch(`${FN_BASE}/agent-mode`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({ prompt: finalPromptToAI, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
+          body: JSON.stringify({ prompt: input, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
         });
         const data = await r.json();
         if (data.error) throw new Error(data.error);
@@ -895,12 +827,12 @@ export default function Index() {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
           body: JSON.stringify({
-            prompt: finalPromptToAI, history: aiHistory, images: imgs,
+            prompt: input, history: aiHistory, images: imgs,
             attachedFile: file ? { name: file.name, content: file.data } : null,
             preferredProvider: model,
             systemPrompt: enrichedSystemPrompt,
             onlineCompilerKey: ONLINE_COMPILER_API_KEY,
-            ...(isFix ? { fixError: finalPromptToAI, currentCode: code } : {}),
+            ...(isFix ? { fixError: input, currentCode: code } : {}),
           }),
         });
         const data = await resp.json();
@@ -962,19 +894,13 @@ export default function Index() {
           linuxCommands: [/python/i.test(lower) ? "python3 main.py" : /npm|node/i.test(lower) ? "npm install && npm start" : /apk/i.test(lower) ? "./gradlew assembleRelease" : "bash compile_and_run.sh"] 
         } : {}) 
       };
-
-      setMessages(m => m.map(msg => msg === assistantPlaceholder ? {
-        ...msg,
-        ...finalMsg,
-        alternatives: isRegenerate && msg.alternatives ? [...msg.alternatives, finalMsg.chat || ""] : [finalMsg.chat || ""],
-        currentAltIdx: isRegenerate && msg.alternatives ? msg.alternatives.length : 0
-      } : msg));
+      setMessages(m => [...m, newMsg]);
 
       if (aiImagePrompt) {
          log("ai", `🎨 Yapay Zeka Niyeti Algılandı: Görsel üretimi başlatılıyor...`);
          generateImageWithStableHorde(aiImagePrompt).then(imgUrl => {
             setMessages(m => m.map(msg => {
-                if (msg === assistantPlaceholder) {
+                if (msg === newMsg) {
                     return {
                         ...msg,
                         chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n![Oluşturulan Görsel](${imgUrl})` : `![Oluşturulan Görsel](${imgUrl})`,
@@ -986,7 +912,7 @@ export default function Index() {
             log("success", "✅ Görsel üretimi tamamlandı");
          }).catch(imgErr => {
             setMessages(m => m.map(msg => {
-                if (msg === assistantPlaceholder) {
+                if (msg === newMsg) {
                     return {
                         ...msg,
                         chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n⚠️ Görsel oluşturulamadı: ${imgErr.message}` : `⚠️ Görsel oluşturulamadı: ${imgErr.message}`
@@ -1005,7 +931,7 @@ export default function Index() {
         log("ai", `⚡ AI Canlı Yayın: Evrensel Linux Sandbox API (${ONLINE_COMPILER_API_KEY.slice(0, 8)}...) üzerinden Build & Run akışı devrede...`);
         
         setTimeout(() => {
-          setMessages(m => m.map(msg => msg === assistantPlaceholder ? { ...msg, compileStatus: "running" } : msg));
+          setMessages(m => m.map(msg => msg === newMsg ? { ...msg, compileStatus: "running" } : msg));
           log("info", "$ AI motoru kod öbeğini ve varlıkları Build & Run için terminale yazıyor...");
         }, 1200);
 
@@ -1020,7 +946,7 @@ export default function Index() {
             ? `root@mini-ai-linux:~# tar -czvf project_bundle.zip ./*\n[SUCCESS] Archived project bundle cleanly (Compression: 84%)\n>> ZIP paketi alt arayüzden indirilebilir.`
             : `root@mini-ai-linux:~# build_and_run --auto-trigger\n[SYSTEM] Linux Virtual Sandbox Engine initialized via API Key (54a81b...)\n[EXEC] Process finished cleanly with return code 0.\n>> Canlı yayın arayüzü ve çalışan çıktı yukarıda aktif edildi!`;
 
-          setMessages(m => m.map(msg => msg === assistantPlaceholder ? {
+          setMessages(m => m.map(msg => msg === newMsg ? {
             ...msg,
             compileStatus: "success",
             isCompiling: false,
@@ -1035,7 +961,7 @@ export default function Index() {
       let savedSiteId: string | undefined = undefined;
       if (user?.id) {
         const { data: row } = await supabase.from("sites").insert({
-          prompt: textToSend || "(sohbet)", 
+          prompt: input || "(sohbet)", 
           code: parsed.code || finalChat || "(Boş)", 
           type: parsed.codeType || "chat", 
           model,
@@ -1046,8 +972,6 @@ export default function Index() {
           savedSiteId = row.id;
           loadHistory(); 
         }
-      } else {
-        saveLocalHistory(textToSend || "(sohbet)", parsed.code || finalChat || "(Boş)", parsed.codeType || "chat");
       }
 
       if (parsed.code && parsed.codeType) {
@@ -1223,54 +1147,40 @@ export default function Index() {
     localStorage.setItem("mini_muted", nv ? "1" : "0");
   }
 
-  function handleRegenerate(index: number) {
-    send({ regenerateIndex: index });
-  }
-
-  function handleChangeAlt(index: number, dir: number) {
-    setMessages(m => m.map((msg, i) => {
-      if (i === index && msg.alternatives) {
-        const altIdx = msg.currentAltIdx ?? 0;
-        const newIdx = Math.max(0, Math.min(msg.alternatives.length - 1, altIdx + dir));
-        return { ...msg, currentAltIdx: newIdx };
-      }
-      return msg;
-    }));
-  }
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white dark:bg-[#212121] text-stone-900 dark:text-stone-100">
-      <header className="relative z-20 sticky top-0 bg-white/80 dark:bg-[#212121]/80 backdrop-blur-md">
-        <div className="flex items-center justify-between px-3 h-14">
-          <div className="flex items-center gap-1.5">
+    <div className="relative min-h-screen overflow-hidden text-slate-900" style={{ backgroundColor: "#faf7f5" }}>
+      <header className="relative z-20 sticky top-0">
+        <div className="flex items-center justify-between px-3 sm:px-5 h-14 gap-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
-              className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-600 dark:text-stone-400"
+              className="flex items-center gap-2 rounded-full bg-white shadow-sm border border-stone-200 pl-3 pr-3.5 h-10 hover:bg-stone-50 transition relative"
               aria-label="Menü"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4 text-stone-700" />
+              <span className="font-semibold text-stone-900 text-[15px] leading-none">Mini AI</span>
+              {historyList.length > 0 && <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-stone-400" />}
             </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-700 dark:text-stone-300 font-medium text-[15px]">
-                  {model === "qwen-coder" ? "Uzman Kodlayıcı" : model === "grok" ? "Grok 2" : "Mini AI Hızlı"}
-                  <ChevronDown className="w-4 h-4 text-stone-500" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48 bg-white dark:bg-[#212121] border-stone-200 dark:border-stone-800 rounded-xl p-1">
-                <DropdownMenuItem onClick={() => { setModel("sambanova"); toast.info("Mini AI Hızlı modu seçildi"); }} className="rounded-lg cursor-pointer">Mini AI Hızlı</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setModel("qwen-coder"); toast.info("Uzman Kodlayıcı modu seçildi"); }} className="rounded-lg cursor-pointer">Uzman Kodlayıcı</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setModel("grok"); toast.info("Grok 2 modu seçildi"); }} className="rounded-lg cursor-pointer">Grok 2</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+
+            
+            <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100" title="Admin Paneli" onClick={() => setAdminPanelOpen(true)}>
+              <ShieldCheck className="w-5 h-5" />
+            </Button>
+            <button
+              onClick={toggleMute}
+              className="w-10 h-10 rounded-full bg-white shadow-sm border border-stone-200 flex items-center justify-center hover:bg-stone-50 transition"
+              aria-label={muted ? "Sesi aç" : "Sesi kapat"}
+            >
+              {muted ? <VolumeX className="w-5 h-5 text-stone-700" /> : <Volume2 className="w-5 h-5 text-stone-700" />}
+            </button>
             <button
               onClick={resetAll}
-              className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-stone-100 dark:hover:bg-stone-800 transition text-stone-600 dark:text-stone-400"
-              title="Yeni sohbet"
+              className="w-10 h-10 rounded-full bg-white shadow-sm border border-stone-200 flex items-center justify-center hover:bg-stone-50 transition"
+              aria-label="Yeni sohbet"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5 text-stone-700" />
             </button>
           </div>
         </div>
@@ -1479,11 +1389,7 @@ export default function Index() {
               welcomeDone={welcomeDone}
               chatEndRef={chatEndRef}
               onImageClick={(url) => setPreviewImageUrl(url)}
-              onRegenerate={handleRegenerate}
-              onChangeAlt={handleChangeAlt}
-              onPromptSelect={(promptText) => {
-                setInput(promptText);
-              }}
+              onVideoClick={(url) => setPreviewVideoUrl(url)}
             />
           </ScrollArea>
 
@@ -1505,8 +1411,6 @@ export default function Index() {
             imageInputRef={imageInputRef}
             cameraInputRef={cameraInputRef}
             openPricing={() => setPricingOpen(true)}
-            thinkMode={thinkMode}
-            setThinkMode={setThinkMode}
           />
         </aside>
       </div>
@@ -1516,8 +1420,8 @@ export default function Index() {
       <input ref={cameraInputRef} type="file" className="hidden" accept="image/*" capture="environment" onChange={handleImagePick} />
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left" className="w-80 p-0 flex flex-col bg-white dark:bg-[#171717]">
-          <SheetHeader className="p-4 border-b border-stone-200 dark:border-stone-800">
+        <SheetContent side="left" className="w-80 p-0 flex flex-col" style={{ backgroundColor: "#faf7f5" }}>
+          <SheetHeader className="p-4 border-b border-stone-200">
             <SheetTitle className="text-stone-900 flex items-center gap-2">
               <span className="font-bold text-lg">Mini AI</span>
               <span className="text-xs text-stone-400 font-normal">Geçmiş & Ayarlar</span>
@@ -1599,7 +1503,7 @@ export default function Index() {
       </Sheet>
 
       <Dialog open={generatorOpen} onOpenChange={setGeneratorOpen}>
-        <DialogContent className="rounded-2xl max-w-lg p-6 max-h-[85vh] flex flex-col bg-white dark:bg-[#212121]">
+        <DialogContent className="rounded-2xl max-w-lg p-6 max-h-[85vh] flex flex-col" style={{ backgroundColor: "#faf7f5" }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-stone-900 font-bold text-lg">
               <Bot className="w-5 h-5 text-emerald-600 animate-pulse" /> AI Akıllı Şifre & Lisans Havuzu (Otonom)
@@ -1638,7 +1542,7 @@ export default function Index() {
       </Dialog>
 
       <Dialog open={promoOpen} onOpenChange={setPromoOpen}>
-        <DialogContent className="rounded-2xl max-w-sm bg-white dark:bg-[#212121]">
+        <DialogContent className="rounded-2xl max-w-sm" style={{ backgroundColor: "#faf7f5" }}>
           <DialogHeader>
             <DialogTitle>Promo Kodu</DialogTitle>
           </DialogHeader>
@@ -1650,7 +1554,7 @@ export default function Index() {
       </Dialog>
 
       <Dialog open={apiKeysOpen} onOpenChange={setApiKeysOpen}>
-        <DialogContent className="rounded-2xl max-w-md p-6 bg-white dark:bg-[#212121]">
+        <DialogContent className="rounded-2xl max-w-md" style={{ backgroundColor: "#faf7f5" }}>
           <DialogHeader>
             <DialogTitle>API Anahtarları</DialogTitle>
           </DialogHeader>
@@ -1693,7 +1597,7 @@ export default function Index() {
       {voiceOpen && <VoiceMode open={true} onClose={() => setVoiceOpen(false)} />}
 
       <Dialog open={onboardOpen} onOpenChange={setOnboardOpen}>
-        <DialogContent className="rounded-3xl max-w-sm p-6 [&>button]:hidden bg-white dark:bg-[#212121]">
+        <DialogContent className="rounded-2xl max-w-sm" style={{ backgroundColor: "#faf7f5" }}>
           <DialogHeader>
             <DialogTitle>
               {onboardStep === 0 ? "Mini AI'ye hoş geldin 👋" : onboardStep === 1 ? "Ne yapmak istiyorsun?" : "Nasıl bir stil tercih edersin?"}
@@ -1740,7 +1644,7 @@ export default function Index() {
       </Dialog>
 
       <Dialog open={smsOpen} onOpenChange={setSmsOpen}>
-        <DialogContent className="rounded-2xl max-w-sm bg-white dark:bg-[#212121]">
+        <DialogContent className="rounded-2xl max-w-sm" style={{ backgroundColor: "#faf7f5" }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-stone-900 font-bold">
               <Smartphone className="w-5 h-5 text-emerald-600" />

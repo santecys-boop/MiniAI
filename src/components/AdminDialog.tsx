@@ -21,7 +21,7 @@ export function AdminDialog({ open, onOpenChange }: AdminDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-3xl max-w-lg p-6 overflow-auto max-h-[90vh] bg-white dark:bg-[#212121]">
+      <DialogContent className="rounded-3xl max-w-lg p-6 overflow-auto max-h-[90vh]" style={{ backgroundColor: "#faf7f5" }}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold text-stone-900">
             <ShieldCheck className="w-5 h-5 text-emerald-600" /> Admin Paneli — Kupon Yönetimi

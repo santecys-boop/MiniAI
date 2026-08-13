@@ -40,9 +40,6 @@ export type Msg = {
   appVisionData?: { appName: string; elementsCount: number; domStructure: string; bypassMode: string };
   projectFiles?: ProjectFile[];
   projectApiKey?: string;
-  alternatives?: string[];
-  currentAltIdx?: number;
-  thinkMode?: boolean;
 };
 
 export type LogEntry = {

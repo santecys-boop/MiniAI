@@ -1274,9 +1274,12 @@ export default function VoiceMode({
         }
       }
     } catch {
-      /* Fallback to WebSpeech */
+      /* Fallback to Google Translate MP3 URL below */
     }
-    throw new Error("Cloud TTS Unavailable");
+    
+    // Google Translate TTS direct MP3 fallback (100% works everywhere)
+    const encoded = encodeURIComponent(text.slice(0, 190));
+    return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=tr&client=tw-ob`;
   }
 
   /** Bir Base64 / Audio URL'ini çal; bitince/hata olunca/iptal edilince resolve olur */
@@ -1523,7 +1526,7 @@ export default function VoiceMode({
   const hasText = textInput.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden select-none vm-root bg-white dark:bg-[#212121]">
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden select-none vm-root" style={{ backgroundColor: "#faf7f5" }}>
       {/* ── Global animasyon tanımları ── */}
       <style>{`
         .vm-root { animation: vmFade .35s ease; }

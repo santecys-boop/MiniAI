@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Plus, Camera, ImageIcon, Paperclip, Wand2, Atom, FileText, X
+  Plus, Camera, ImageIcon, Paperclip, Wand2, FileText, X
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PromptInput } from "@/components/ui/ai-chat-input";
@@ -24,15 +24,12 @@ export type ChatBottomBarProps = {
   imageInputRef: React.RefObject<HTMLInputElement | null>;
   cameraInputRef: React.RefObject<HTMLInputElement | null>;
   openPricing: () => void;
-  thinkMode: boolean;
-  setThinkMode: (v: boolean) => void;
 };
 
 export function ChatBottomBar({
   input, setInput, pendingAttachments, setPendingAttachments, busy, setBusy,
   model, setModel, hasCode, send, toggleMic, attachOpen, setAttachOpen,
-  fileInputRef, imageInputRef, cameraInputRef, openPricing,
-  thinkMode, setThinkMode
+  fileInputRef, imageInputRef, cameraInputRef, openPricing
 }: ChatBottomBarProps) {
 
   const modelMap: Record<string, string> = {
@@ -70,51 +67,32 @@ export function ChatBottomBar({
         </div>
       )}
 
-      {/* Top Bar Controls: Düşün & Attachment Popover */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-1.5">
-          {/* Düşün button */}
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); setThinkMode(!thinkMode); }}
-            className={`h-8 px-3 rounded-full border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-              thinkMode 
-                ? "bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 shadow-xs" 
-                : "bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700"
-            }`}
-          >
-            <Atom className="w-3.5 h-3.5" />
-            <span>Düşün</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {/* Attach (+) button */}
-          <Popover open={attachOpen} onOpenChange={setAttachOpen}>
-            <PopoverTrigger asChild>
-              <button type="button" className="h-8 px-2.5 rounded-full border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer" title="Ekle">
-                <Plus className="w-3.5 h-3.5" />
-                <span>Ekle</span>
+      {/* Top Bar Controls: Attachment Popover (+) */}
+      <div className="flex items-center justify-end px-1">
+        <Popover open={attachOpen} onOpenChange={setAttachOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className="h-8 px-3 rounded-full border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer" title="Ekle">
+              <Plus className="w-3.5 h-3.5" />
+              <span>Ekle / Medya</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="end" className="w-52 p-1 rounded-2xl border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xl">
+            <button type="button" onClick={() => { setAttachOpen(false); cameraInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
+              <Camera className="w-4 h-4 text-stone-500" /> Kamerayla çek
+            </button>
+            <button type="button" onClick={() => { setAttachOpen(false); imageInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
+              <ImageIcon className="w-4 h-4 text-stone-500" /> Görsel yükle
+            </button>
+            <button type="button" onClick={() => { setAttachOpen(false); fileInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
+              <Paperclip className="w-4 h-4 text-stone-500" /> Dosya ekle
+            </button>
+            {hasCode && (
+              <button type="button" onClick={() => { setAttachOpen(false); send({ fix: true }); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
+                <Wand2 className="w-4 h-4 text-stone-500" /> Kodu düzelt
               </button>
-            </PopoverTrigger>
-            <PopoverContent side="top" align="end" className="w-52 p-1 rounded-2xl border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xl">
-              <button type="button" onClick={() => { setAttachOpen(false); cameraInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
-                <Camera className="w-4 h-4 text-stone-500" /> Kamerayla çek
-              </button>
-              <button type="button" onClick={() => { setAttachOpen(false); imageInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
-                <ImageIcon className="w-4 h-4 text-stone-500" /> Görsel yükle
-              </button>
-              <button type="button" onClick={() => { setAttachOpen(false); fileInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
-                <Paperclip className="w-4 h-4 text-stone-500" /> Dosya ekle
-              </button>
-              {hasCode && (
-                <button type="button" onClick={() => { setAttachOpen(false); send({ fix: true }); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
-                  <Wand2 className="w-4 h-4 text-stone-500" /> Kodu düzelt
-                </button>
-              )}
-            </PopoverContent>
-          </Popover>
-        </div>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Main Integrated Interactive PromptInput Component */}
