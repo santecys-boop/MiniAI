@@ -34,8 +34,7 @@ export function ChatBottomBar({
 
   const modelMap: Record<string, string> = {
     "Mini AI Hızlı": "sambanova",
-    "Uzman Kodlayıcı": "qwen-coder",
-    "Grok 2": "grok"
+    "Uzman Kodlayıcı": "qwen-coder"
   };
 
   const handleModelSelect = (selectedName: string) => {
@@ -49,6 +48,36 @@ export function ChatBottomBar({
       send();
     }
   };
+
+  const attachPopover = (
+    <Popover open={attachOpen} onOpenChange={setAttachOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex size-7 items-center justify-center rounded-full text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition-all duration-200 hover:bg-stone-100 dark:hover:bg-stone-800 outline-none cursor-pointer"
+          title="Medya / Dosya Ekle"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="end" className="w-52 p-1 rounded-2xl border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xl z-[60]">
+        <button type="button" onClick={() => { setAttachOpen(false); cameraInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200 cursor-pointer">
+          <Camera className="w-4 h-4 text-stone-500" /> Kamerayla çek
+        </button>
+        <button type="button" onClick={() => { setAttachOpen(false); imageInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200 cursor-pointer">
+          <ImageIcon className="w-4 h-4 text-stone-500" /> Görsel yükle
+        </button>
+        <button type="button" onClick={() => { setAttachOpen(false); fileInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200 cursor-pointer">
+          <Paperclip className="w-4 h-4 text-stone-500" /> Dosya ekle
+        </button>
+        {hasCode && (
+          <button type="button" onClick={() => { setAttachOpen(false); send({ fix: true }); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200 cursor-pointer">
+            <Wand2 className="w-4 h-4 text-stone-500" /> Kodu düzelt
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <div className="w-full max-w-3xl mx-auto px-3 pb-3 pt-1 space-y-2">
@@ -67,34 +96,6 @@ export function ChatBottomBar({
         </div>
       )}
 
-      {/* Top Bar Controls: Attachment Popover (+) */}
-      <div className="flex items-center justify-end px-1">
-        <Popover open={attachOpen} onOpenChange={setAttachOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="h-8 px-3 rounded-full border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer" title="Ekle">
-              <Plus className="w-3.5 h-3.5" />
-              <span>Ekle / Medya</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="top" align="end" className="w-52 p-1 rounded-2xl border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xl">
-            <button type="button" onClick={() => { setAttachOpen(false); cameraInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
-              <Camera className="w-4 h-4 text-stone-500" /> Kamerayla çek
-            </button>
-            <button type="button" onClick={() => { setAttachOpen(false); imageInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
-              <ImageIcon className="w-4 h-4 text-stone-500" /> Görsel yükle
-            </button>
-            <button type="button" onClick={() => { setAttachOpen(false); fileInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
-              <Paperclip className="w-4 h-4 text-stone-500" /> Dosya ekle
-            </button>
-            {hasCode && (
-              <button type="button" onClick={() => { setAttachOpen(false); send({ fix: true }); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-left text-sm text-stone-700 dark:text-stone-200">
-                <Wand2 className="w-4 h-4 text-stone-500" /> Kodu düzelt
-              </button>
-            )}
-          </PopoverContent>
-        </Popover>
-      </div>
-
       {/* Main Integrated Interactive PromptInput Component */}
       <PromptInput
         value={input}
@@ -102,9 +103,10 @@ export function ChatBottomBar({
         onSubmit={handlePromptSubmit}
         onModelChange={handleModelSelect}
         onToggleMic={toggleMic}
+        attachPopoverNode={attachPopover}
         busy={busy}
         placeholder="Mesaj yazın veya konuşmak için dokunun..."
-        models={["Mini AI Hızlı", "Uzman Kodlayıcı", "Grok 2"]}
+        models={["Mini AI Hızlı", "Uzman Kodlayıcı"]}
         efforts={["Low", "Medium", "Max Effort"]}
       />
     </div>

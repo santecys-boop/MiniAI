@@ -54,24 +54,18 @@ function MorphingText({ text }: { text: string }) {
 }
 
 function ModelIcon({ model, className }: { model: string; className?: string }) {
-  const icons: Record<string, string> = {
-    "Composer 2.5": "https://res.cloudinary.com/drhx7imeb/image/upload/v1781695268/cursor-ai-code-icon_j4vnux.svg",
-    "Gemini 3.5 Flash": "https://res.cloudinary.com/drhx7imeb/image/upload/v1781695268/google-gemini-icon_l6kk5q.svg",
-    "GPT 5.5": "https://res.cloudinary.com/drhx7imeb/image/upload/v1781695269/openai-icon_zozuib.svg",
-    "Opus 4.8": "https://res.cloudinary.com/drhx7imeb/image/upload/v1781695268/Claude_AI_symbol_yqfzlc.svg",
-    "GLM 5.2": "https://res.cloudinary.com/drhx7imeb/image/upload/v1781695269/z-ai-icon_xi4xvo.svg"
-  };
-
-  const filters: Record<string, string> = {
-    "GPT 5.5": "dark:invert", 
-  };
+  if (model === "Uzman Kodlayıcı") {
+    return (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className={cn("object-contain", className)} aria-hidden="true">
+        <path d="M4.5 3.5L1.5 7L4.5 10.5M9.5 3.5L12.5 7L9.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
 
   return (
-    <img 
-      src={icons[model] || icons["GPT 5.5"]} 
-      alt={model} 
-      className={cn("object-contain", filters[model], className)} 
-    />
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className={cn("object-contain", className)} aria-hidden="true">
+      <path d="M7 1v12M1 7h12M2.5 2.5l9 9M11.5 2.5l-9 9" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" opacity="0.8" />
+    </svg>
   );
 }
 
@@ -306,6 +300,8 @@ export interface PromptInputProps {
   maxAttachments?: number;
   onModelChange?: (model: string) => void;
   onToggleMic?: () => void;
+  onAttachClick?: (e: React.MouseEvent) => void;
+  attachPopoverNode?: React.ReactNode;
   busy?: boolean;
 }
 
@@ -315,7 +311,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       onSubmit,
       placeholder = "Mesaj yazın...",
       className,
-      models = ["Mini AI Hızlı", "Uzman Kodlayıcı", "Grok 2"],
+      models = ["Mini AI Hızlı", "Uzman Kodlayıcı"],
       efforts = ["Low", "Medium", "Max Effort"],
       defaultValue = "",
       value: controlledValue,
@@ -323,6 +319,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       maxAttachments = 6,
       onModelChange,
       onToggleMic,
+      onAttachClick,
+      attachPopoverNode,
       busy = false,
     },
     ref
@@ -923,12 +921,24 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                 <span className="text-xs font-semibold select-none transition-colors"><MorphingText text={efforts[effortIndex]} /></span>
               </button>
 
-              <button
-                type="button" onMouseDown={(e) => e.preventDefault()} onClick={openFileChooser} disabled={attachments.length >= maxAttachments}
-                className="ml-auto flex size-7 items-center justify-center rounded-full text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition-all duration-200 hover:bg-stone-100 dark:hover:bg-stone-800 outline-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-              >
-                <PlusIcon />
-              </button>
+              {attachPopoverNode ? (
+                <div className="ml-auto flex items-center justify-center">
+                  {attachPopoverNode}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    if (onAttachClick) onAttachClick(e);
+                    else openFileChooser(e);
+                  }}
+                  disabled={attachments.length >= maxAttachments}
+                  className="ml-auto flex size-7 items-center justify-center rounded-full text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition-all duration-200 hover:bg-stone-100 dark:hover:bg-stone-800 outline-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  <PlusIcon />
+                </button>
+              )}
             </div>
 
             <div
