@@ -1,7 +1,7 @@
-// Local kredi sistemi: 20 kredi / 5 saatte bir yenilenir + promo unlimited
-const KEY = "mini_credits_v1";
+// Local kredi sistemi: 35 kredi / 5 saatte bir yenilenir + promo unlimited
+const KEY = "mini_credits_v2";
 const PROMO_KEY = "mini_promo_unlimited";
-const MAX = 20;
+const MAX = 35;
 const REFILL_MS = 5 * 60 * 60 * 1000;
 
 type CreditState = { count: number; lastRefill: number };

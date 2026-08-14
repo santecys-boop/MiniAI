@@ -16,24 +16,57 @@ async function fetchRole(userId: string): Promise<AuthRole> {
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const g = localStorage.getItem("mini_ai_google_user");
+      if (g) return JSON.parse(g);
+    } catch {}
+    return null;
+  });
   const [role, setRole] = useState<AuthRole>(null);
   const [loading, setLoading] = useState(true);
+
+  const logout = async () => {
+    localStorage.removeItem("mini_ai_google_user");
+    setUser(null);
+    setRole(null);
+    try { await supabase.auth.signOut(); } catch {}
+    window.location.reload();
+  };
 
   useEffect(() => {
     let mounted = true;
 
-    // Timeout: 3 saniye içinde cevap gelmezse uygulamayı aç
+    // Google Local Storage User Check
+    const checkGoogleUser = () => {
+      try {
+        const g = localStorage.getItem("mini_ai_google_user");
+        if (g) {
+          const parsed = JSON.parse(g);
+          if (mounted) {
+            setUser(parsed);
+            setRole("user");
+            setLoading(false);
+            return true;
+          }
+        }
+      } catch {}
+      return false;
+    };
+
+    if (checkGoogleUser()) return;
+
+    // Timeout
     const timeout = setTimeout(() => {
       if (mounted && loading) {
         setLoading(false);
       }
-    }, 3000);
+    }, 2000);
 
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!mounted) return;
-      setUser(session?.user ?? null);
       if (session?.user) {
+        setUser(session.user);
         fetchRole(session.user.id).then((nextRole) => {
           if (!mounted) return;
           setRole(nextRole);
@@ -42,25 +75,29 @@ export function useAuth() {
           if (mounted) setLoading(false);
         });
       } else {
-        setRole(null);
+        if (!checkGoogleUser()) {
+          setUser(null);
+          setRole(null);
+        }
         setLoading(false);
       }
     });
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
-      setUser(session?.user ?? null);
       if (session?.user) {
+        setUser(session.user);
         try {
           setRole(await fetchRole(session.user.id));
         } catch {
           setRole("user");
         }
       } else {
-        setRole(null);
+        checkGoogleUser();
       }
       if (mounted) setLoading(false);
     }).catch(() => {
+      checkGoogleUser();
       if (mounted) setLoading(false);
     });
 
@@ -71,7 +108,7 @@ export function useAuth() {
     };
   }, []);
 
-  return { user, role, loading };
+  return { user, role, loading, logout };
 }
 
 export function RequireAdmin({ children }: { children: React.ReactNode }) {

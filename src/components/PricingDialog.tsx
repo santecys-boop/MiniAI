@@ -37,7 +37,7 @@ export function PricingDialog({ open, onOpenChange }: PricingDialogProps) {
                 <span className="text-xs text-stone-400">/ her zaman</span>
               </div>
               <ul className="mt-6 space-y-2.5 text-xs text-stone-600">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-stone-400 shrink-0" /> Günlük 20 kredi</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-stone-400 shrink-0" /> Günlük 35 kredi</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-stone-400 shrink-0" /> Temel model (Mini-Flash 2)</li>
                 <li className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-amber-500 shrink-0" /> Limitli E2B (Günde 3)</li>
                 <li className="flex items-center gap-2 text-stone-400 line-through"><X className="w-4 h-4 text-rose-400 shrink-0" /> İşlevsel site üretimi</li>

@@ -43,6 +43,38 @@ const GOOGLE_CLIENT_ID = "930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.goo
 
 export async function handleGoogleLogin() {
   try {
+    // 1. Google Identity Services (Popup Flow - redirect_uri_mismatch hatasını engeller)
+    if (typeof (window as any).google !== "undefined" && (window as any).google.accounts?.oauth2) {
+      const client = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: "openid email profile",
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            try {
+              const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+              });
+              const profile = await res.json();
+              const googleUser = {
+                id: profile.sub,
+                email: profile.email,
+                name: profile.name || profile.email.split("@")[0],
+                avatar: profile.picture,
+              };
+              localStorage.setItem("mini_ai_google_user", JSON.stringify(googleUser));
+              toast.success(`Google ile giriş başarılı! Hoş geldin ${googleUser.name}`);
+              setTimeout(() => window.location.reload(), 500);
+            } catch (e: any) {
+              toast.error("Google kullanıcı bilgileri alınamadı: " + e.message);
+            }
+          }
+        },
+      });
+      client.requestAccessToken();
+      return;
+    }
+
+    // 2. Standart OAuth Redirect Fallback
     const redirectUri = window.location.origin;
     const targetUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${GOOGLE_CLIENT_ID}&` +
@@ -259,6 +291,7 @@ export default function Index() {
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [generatedBatch, setGeneratedBatch] = useState<string[]>([]);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
+  const [infoModalOpen, setInfoModalOpen] = useState(true);
   const [selectedFileIdx, setSelectedFileIdx] = useState<number>(0);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
@@ -1186,8 +1219,36 @@ export default function Index() {
             </button>
           </div>
           <div className="flex items-center gap-2">
+            {user ? (
+              <div 
+                onClick={() => setMenuOpen(true)}
+                className="flex items-center gap-1.5 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-full pl-1.5 pr-3 py-1 shadow-sm cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800 transition select-none"
+              >
+                {user.avatar || user.user_metadata?.avatar_url || user.user_metadata?.picture ? (
+                  <img
+                    src={user.avatar || user.user_metadata?.avatar_url || user.user_metadata?.picture}
+                    alt="Profil"
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[11px] font-bold">
+                    {(user.name || user.email || "U")[0].toUpperCase()}
+                  </div>
+                )}
+                <span className="text-xs font-semibold text-stone-800 dark:text-stone-200 max-w-[90px] truncate">
+                  {user.name || user.email?.split("@")[0] || "Kullanıcı"}
+                </span>
+              </div>
+            ) : (
+              <button
+                onClick={() => setMenuOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800 transition shadow-sm select-none"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Giriş</span>
+              </button>
+            )}
 
-            
             <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100" title="Admin Paneli" onClick={() => setAdminPanelOpen(true)}>
               <ShieldCheck className="w-5 h-5" />
             </Button>
@@ -1524,6 +1585,33 @@ export default function Index() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Açılış Bilgilendirme Kartı (Demo & Sistem Bilgisi) */}
+      <Dialog open={infoModalOpen} onOpenChange={setInfoModalOpen}>
+        <DialogContent className="rounded-3xl max-w-md p-6 border border-stone-200 dark:border-stone-800 bg-white/95 dark:bg-stone-900/95 backdrop-blur-xl shadow-2xl animate-fade-in select-none">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+              <Sparkle className="w-5 h-5 animate-pulse" />
+              <DialogTitle className="text-base font-bold text-stone-900 dark:text-stone-100">
+                Mini AI Bilgilendirme
+              </DialogTitle>
+            </div>
+            <div className="space-y-3 text-xs leading-relaxed text-stone-700 dark:text-stone-300">
+              <p className="p-4 rounded-2xl bg-stone-100 dark:bg-stone-800/80 border border-stone-200/80 dark:border-stone-700/80 font-medium leading-relaxed">
+                Bu bir yapay zekadır. 24 mühendis tarafından oluşturulmuştur bu bir demo sürümdür yapay zeka hata yapabilir arayüz de hatalar olabilir gelişen bir sürümdür ve yerli ve milli yapay zeka mini ai altyapısı kullanıyordur voice mode yavaşdır lütfen saygı gösteriniz
+              </p>
+            </div>
+          </DialogHeader>
+          <div className="pt-2">
+            <Button
+              onClick={() => setInfoModalOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-white text-white dark:text-stone-900 font-semibold text-xs transition shadow-md"
+            >
+              Anladım, Devam Et
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={generatorOpen} onOpenChange={setGeneratorOpen}>
         <DialogContent className="rounded-2xl max-w-lg p-6 max-h-[85vh] flex flex-col" style={{ backgroundColor: "#faf7f5" }}>
