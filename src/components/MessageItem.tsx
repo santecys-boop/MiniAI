@@ -96,10 +96,25 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
 
   return (
     <div className="flex gap-3.5 md:gap-4 animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
-      {/* Bot Avatar */}
-      <div className="shrink-0 mt-0.5 flex items-start justify-center">
-        <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-          <Sparkle className="w-4 h-4 fill-white/20" />
+      {/* Praashoo7 Ball Loader Avatar */}
+      <div className="shrink-0 mt-0.5 flex items-start justify-center" style={{ width: 32, height: 32 }}>
+        <div className="main" style={{ position: 'relative', fontSize: '2.4px', marginTop: '16px' }}>
+          <div className="loaders" style={{ position: 'relative' }}>
+            <div className="loader" /><div className="loader" /><div className="loader" />
+            <div className="loader" /><div className="loader" /><div className="loader" />
+            <div className="loader" /><div className="loader" /><div className="loader" />
+          </div>
+          <div className="loadersB" style={{ position: 'absolute', top: 0, left: 0 }}>
+            <div className="loaderA"><div className="ball0" /></div>
+            <div className="loaderA"><div className="ball1" /></div>
+            <div className="loaderA"><div className="ball2" /></div>
+            <div className="loaderA"><div className="ball3" /></div>
+            <div className="loaderA"><div className="ball4" /></div>
+            <div className="loaderA"><div className="ball5" /></div>
+            <div className="loaderA"><div className="ball6" /></div>
+            <div className="loaderA"><div className="ball7" /></div>
+            <div className="loaderA"><div className="ball8" /></div>
+          </div>
         </div>
       </div>
 
