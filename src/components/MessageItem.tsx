@@ -94,18 +94,11 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
   const planSentences = m.plan ? m.plan.split("\n").filter(s => s.trim() !== "") : undefined;
 
   return (
-    <div className="animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
-      {/* ThinkingReasoning - balonun dışında, bağımsız */}
-      {m.effort && m.effort !== "Low" && (
-        <div className="mb-2 pl-11 md:pl-12">
-          <ThinkingReasoning effort={m.effort} sentences={planSentences} />
-        </div>
-      )}
-
-      <div className="flex gap-3.5 md:gap-4">
-      {/* Praashoo7 Ball Loader - Bot ikonu yerine (Tam 32x32 boyutu için font-size ile küçültüldü) */}
-      <div className="shrink-0 mt-0.5 flex items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800 ring-1 ring-stone-200 dark:ring-stone-700" style={{ width: 32, height: 32, overflow: 'hidden' }}>
-        <div className="main" style={{ position: 'relative', fontSize: '2.4px' }}>
+    <div className="flex gap-3.5 md:gap-4 animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
+      
+      {/* Praashoo7 Ball Loader - Avatar */}
+      <div className="shrink-0 mt-0.5 flex items-start justify-center" style={{ width: 32, height: 32 }}>
+        <div className="main" style={{ position: 'relative', fontSize: '2.4px', marginTop: '16px' }}>
           <div className="loaders" style={{ position: 'relative' }}>
             <div className="loader" /><div className="loader" /><div className="loader" />
             <div className="loader" /><div className="loader" /><div className="loader" />
@@ -125,7 +118,17 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 text-sm font-sans min-w-0">
+      {/* Message Content (Thinking + Text) */}
+      <div className="flex-1 space-y-3 min-w-0">
+        
+        {/* ThinkingReasoning (En üstte) */}
+        {m.effort && m.effort !== "Low" && (
+          <div className="mb-1">
+            <ThinkingReasoning effort={m.effort} sentences={planSentences} />
+          </div>
+        )}
+
+        <div className="text-sm font-sans space-y-3">
         {m.attachments && m.attachments.length > 0 && !imageUrl && (
           <div className="flex flex-wrap gap-1.5">
             {m.attachments.map((a, j) => (
@@ -355,7 +358,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             <span>Yapay zeka düşünüyor...</span>
           </div>
         )}
-      </div>
+        </div>
       </div>
     </div>
   );
