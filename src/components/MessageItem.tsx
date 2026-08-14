@@ -103,15 +103,15 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
       )}
 
       <div className="flex gap-3.5 md:gap-4">
-      {/* Praashoo7 Ball Loader - Bot ikonu yerine */}
-      <div className="shrink-0 mt-0.5 flex items-center justify-center" style={{ width: 32, height: 32 }}>
-        <div className="main" style={{ width: 32, height: 32, position: 'relative' }}>
-          <div className="loaders" style={{ width: 32, height: 32, position: 'relative' }}>
+      {/* Praashoo7 Ball Loader - Bot ikonu yerine (Tam 32x32 boyutu için font-size ile küçültüldü) */}
+      <div className="shrink-0 mt-0.5 flex items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800 ring-1 ring-stone-200 dark:ring-stone-700" style={{ width: 32, height: 32, overflow: 'hidden' }}>
+        <div className="main" style={{ position: 'relative', fontSize: '2.4px' }}>
+          <div className="loaders" style={{ position: 'relative' }}>
             <div className="loader" /><div className="loader" /><div className="loader" />
             <div className="loader" /><div className="loader" /><div className="loader" />
             <div className="loader" /><div className="loader" /><div className="loader" />
           </div>
-          <div className="loadersB" style={{ position: 'absolute', top: 0, left: 0, width: 32, height: 32 }}>
+          <div className="loadersB" style={{ position: 'absolute', top: 0, left: 0 }}>
             <div className="loaderA"><div className="ball0" /></div>
             <div className="loaderA"><div className="ball1" /></div>
             <div className="loaderA"><div className="ball2" /></div>
