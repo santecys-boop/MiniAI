@@ -96,17 +96,11 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
 
   return (
     <div className="flex gap-3.5 md:gap-4 animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
-      
-      {/* TetrisLoader - Avatar */}
+      {/* Bot Avatar */}
       <div className="shrink-0 mt-0.5 flex items-start justify-center">
-        <TetrisLoader 
-          columns={8} 
-          rows={12} 
-          cellSize={3} 
-          gap={1} 
-          playing={isStreaming || !isChatDone || !isTypingDone} 
-          label="MiniAI" 
-        />
+        <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+          <Sparkle className="w-4 h-4 fill-white/20" />
+        </div>
       </div>
 
       {/* Message Content (Thinking + Text) */}
@@ -231,6 +225,29 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
         )}
 
 
+
+        {/* Web Site / Kod Üretim Tetris Animasyonu (Yalnızca web sitesi/kod üretilirken) */}
+        {(m.code || m.compileStatus || m.projectFiles) && (!isTypingDone || m.compileStatus === "starting" || m.compileStatus === "running") && (
+          <div className="bg-stone-900/95 text-stone-100 flex items-center gap-4 rounded-2xl border border-stone-800 p-4 shadow-xl my-2.5 animate-fade-in">
+            <TetrisLoader
+              columns={8}
+              rows={14}
+              cellSize={3.5}
+              gap={1.5}
+              speed={40}
+              label="Web siteniz oluşturuluyor"
+            />
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                <Sparkle className="w-4 h-4 animate-spin text-emerald-400" />
+                Web siteniz oluşturuluyor...
+              </p>
+              <p className="text-stone-400 text-xs leading-relaxed">
+                Yapay zeka kodları ve bileşenleri derlerken botun Tetris oynamasını izleyebilirsiniz.
+              </p>
+            </div>
+          </div>
+        )}
 
         {(m.compileStatus || m.code) && (
           <div className="mt-3 rounded-2xl border border-stone-800 bg-stone-950 p-3 shadow-xl space-y-2.5 text-xs font-mono">
