@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ThinkingReasoning } from "@/components/ui/thinking-reasoning";
+import { TetrisLoader } from "@/components/ui/loader-tetris";
 import { Msg } from "../types";
 import { ONLINE_COMPILER_API_KEY } from "../constants";
 import { injectAIBridge } from "../utils";
@@ -96,26 +97,16 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
   return (
     <div className="flex gap-3.5 md:gap-4 animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
       
-      {/* Praashoo7 Ball Loader - Avatar */}
-      <div className="shrink-0 mt-0.5 flex items-start justify-center" style={{ width: 32, height: 32 }}>
-        <div className="main" style={{ position: 'relative', fontSize: '2.4px', marginTop: '16px' }}>
-          <div className="loaders" style={{ position: 'relative' }}>
-            <div className="loader" /><div className="loader" /><div className="loader" />
-            <div className="loader" /><div className="loader" /><div className="loader" />
-            <div className="loader" /><div className="loader" /><div className="loader" />
-          </div>
-          <div className="loadersB" style={{ position: 'absolute', top: 0, left: 0 }}>
-            <div className="loaderA"><div className="ball0" /></div>
-            <div className="loaderA"><div className="ball1" /></div>
-            <div className="loaderA"><div className="ball2" /></div>
-            <div className="loaderA"><div className="ball3" /></div>
-            <div className="loaderA"><div className="ball4" /></div>
-            <div className="loaderA"><div className="ball5" /></div>
-            <div className="loaderA"><div className="ball6" /></div>
-            <div className="loaderA"><div className="ball7" /></div>
-            <div className="loaderA"><div className="ball8" /></div>
-          </div>
-        </div>
+      {/* TetrisLoader - Avatar */}
+      <div className="shrink-0 mt-0.5 flex items-start justify-center">
+        <TetrisLoader 
+          columns={8} 
+          rows={12} 
+          cellSize={3} 
+          gap={1} 
+          playing={isStreaming || !isChatDone || !isTypingDone} 
+          label="MiniAI" 
+        />
       </div>
 
       {/* Message Content (Thinking + Text) */}
