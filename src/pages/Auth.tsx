@@ -58,19 +58,19 @@ export default function Auth() {
   }
 
   async function signInGoogle() {
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: "http://localhost",
-      },
-    });
-    if (error) {
-      setBusy(false);
-      toast.error("Google girişi başarısız: " + error.message);
-      return;
+    try {
+      const redirectUri = window.location.origin;
+      const targetUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.googleusercontent.com&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=token%20id_token&` +
+        `scope=${encodeURIComponent("openid email profile")}&` +
+        `nonce=${Date.now()}`;
+      
+      window.location.href = targetUrl;
+    } catch (err: any) {
+      toast.error("Google girişi başarısız: " + (err.message || err));
     }
-    // Browser will navigate away, so we just wait
   }
 
   function continueAsGuest() {

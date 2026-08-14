@@ -39,22 +39,19 @@ import { AdminDialog } from "../components/AdminDialog";
 import { runAutonomousAgent } from "../lib/agentEngine";
 import { ImagePreviewModal } from "../components/ImagePreviewModal";
 
+const GOOGLE_CLIENT_ID = "930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.googleusercontent.com";
+
 export async function handleGoogleLogin() {
   try {
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: "http://localhost",
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    });
-    if (error) {
-      toast.error(`Giriş hatası: ${error.message}`);
-    }
+    const redirectUri = window.location.origin;
+    const targetUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${GOOGLE_CLIENT_ID}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=token%20id_token&` +
+      `scope=${encodeURIComponent("openid email profile")}&` +
+      `nonce=${Date.now()}`;
+    
+    window.location.href = targetUrl;
   } catch (err: any) {
     toast.error(`Google ile giriş yapılırken bir hata oluştu: ${err.message || err}`);
   }
@@ -64,7 +61,7 @@ export async function handleGitHubLogin() {
   try {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "github",
-      options: { redirectTo: "http://localhost" },
+      options: { redirectTo: window.location.origin },
     });
     if (error) toast.error(`GitHub giriş hatası: ${error.message}`);
   } catch (err: any) {
@@ -76,7 +73,7 @@ export async function handleDiscordLogin() {
   try {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
-      options: { redirectTo: "http://localhost" },
+      options: { redirectTo: window.location.origin },
     });
     if (error) toast.error(`Discord giriş hatası: ${error.message}`);
   } catch (err: any) {
@@ -286,9 +283,34 @@ export default function Index() {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("mini_theme", theme);
   }, [theme]);
+
+  // Google OAuth Return Token Parser
   useEffect(() => {
-    const id = setInterval(() => setCredits(getCredits()), 30000);
-    return () => clearInterval(id);
+    if (window.location.hash && (window.location.hash.includes("access_token") || window.location.hash.includes("id_token"))) {
+      try {
+        const params = new URLSearchParams(window.location.hash.substring(1));
+        const idToken = params.get("id_token");
+        if (idToken) {
+          const base64Url = idToken.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+          const payload = JSON.parse(jsonPayload);
+          
+          const googleUser = {
+            id: payload.sub,
+            email: payload.email,
+            name: payload.name || payload.email.split("@")[0],
+            avatar: payload.picture,
+          };
+          localStorage.setItem("mini_ai_google_user", JSON.stringify(googleUser));
+          toast.success(`Google ile giriş başarılı! Hoş geldin ${googleUser.name}`);
+          window.history.replaceState(null, "", window.location.pathname);
+          window.location.reload();
+        }
+      } catch (err: any) {
+        console.error("Google token parse error:", err);
+      }
+    }
   }, []);
 
   // AI Bridge Event Listener
@@ -390,16 +412,16 @@ export default function Index() {
 
   async function loadHistory() {
     try {
-      let query = supabase.from("sites").select("*").order("created_at", { ascending: false }).limit(20);
-      if (user?.id) {
-        query = query.eq("user_id", user.id);
+      const localData = localStorage.getItem("mini_ai_sites_history");
+      if (localData) {
+        const parsed = JSON.parse(localData);
+        setHistoryList(parsed);
       } else {
-        query = query.is("user_id", null);
+        setHistoryList([]);
       }
-      const { data } = await query;
-      if (data) setHistoryList(data as SiteRow[]);
     } catch (err) {
       console.error("loadHistory error:", err);
+      setHistoryList([]);
     }
   }
 
