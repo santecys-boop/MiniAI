@@ -16,7 +16,7 @@ export type ChatBottomBarProps = {
   model: string;
   setModel: (v: string) => void;
   hasCode: boolean;
-  send: (opts?: { fix?: boolean; forceImage?: boolean }) => void;
+  send: (opts?: { fix?: boolean; forceImage?: boolean; effort?: string }) => void;
   toggleMic: () => void;
   attachOpen: boolean;
   setAttachOpen: (v: boolean) => void;
@@ -34,19 +34,16 @@ export function ChatBottomBar({
 
   const modelMap: Record<string, string> = {
     "Mini AI Hızlı": "sambanova",
-    "Uzman Kodlayıcı": "qwen-coder"
+    "Uzman Kodlayıcı": "qwen-coder",
   };
 
   const handleModelSelect = (selectedName: string) => {
-    const mapped = modelMap[selectedName] || "sambanova";
-    setModel(mapped);
+    setModel(modelMap[selectedName] || "sambanova");
   };
 
-  const handlePromptSubmit = (value: string, meta: { model: string; effort: string; attachments: File[] }) => {
+  const handlePromptSubmit = (_value: string, meta: { model: string; effort: string; attachments: File[] }) => {
     if (meta.model) handleModelSelect(meta.model);
-    if (!busy) {
-      send({ effort: meta.effort });
-    }
+    if (!busy) send({ effort: meta.effort });
   };
 
   const attachPopover = (
@@ -81,7 +78,6 @@ export function ChatBottomBar({
 
   return (
     <div className="w-full max-w-3xl mx-auto px-3 pb-3 pt-1 space-y-2">
-      {/* Pending attachments info */}
       {pendingAttachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-1">
           {pendingAttachments.map((a, i) => (
@@ -96,7 +92,6 @@ export function ChatBottomBar({
         </div>
       )}
 
-      {/* Main Integrated Interactive PromptInput Component */}
       <PromptInput
         value={input}
         onChange={setInput}

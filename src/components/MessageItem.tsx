@@ -95,7 +95,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
 
   return (
     <div className="animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
-      {/* ThinkingReasoning - outside the bubble, standalone */}
+      {/* ThinkingReasoning - balonun dışında, bağımsız */}
       {m.effort && m.effort !== "Low" && (
         <div className="mb-2 pl-11 md:pl-12">
           <ThinkingReasoning effort={m.effort} sentences={planSentences} />
@@ -103,6 +103,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
       )}
 
       <div className="flex gap-3.5 md:gap-4">
+      {/* Praashoo7 Ball Loader - Bot ikonu yerine */}
       <div className="shrink-0 mt-0.5 flex items-center justify-center" style={{ width: 32, height: 32 }}>
         <div className="main" style={{ width: 32, height: 32, position: 'relative' }}>
           <div className="loaders" style={{ width: 32, height: 32, position: 'relative' }}>
@@ -111,15 +112,20 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             <div className="loader" /><div className="loader" /><div className="loader" />
           </div>
           <div className="loadersB" style={{ position: 'absolute', top: 0, left: 0, width: 32, height: 32 }}>
-            <div className="loaderA" /><div className="loaderA" /><div className="loaderA" />
-            <div className="loaderA" /><div className="loaderA" /><div className="loaderA" />
-            <div className="loaderA" /><div className="loaderA" /><div className="loaderA" />
+            <div className="loaderA"><div className="ball0" /></div>
+            <div className="loaderA"><div className="ball1" /></div>
+            <div className="loaderA"><div className="ball2" /></div>
+            <div className="loaderA"><div className="ball3" /></div>
+            <div className="loaderA"><div className="ball4" /></div>
+            <div className="loaderA"><div className="ball5" /></div>
+            <div className="loaderA"><div className="ball6" /></div>
+            <div className="loaderA"><div className="ball7" /></div>
+            <div className="loaderA"><div className="ball8" /></div>
           </div>
         </div>
       </div>
-      
-      <div className="flex-1 space-y-3 text-sm font-sans min-w-0">
 
+      <div className="flex-1 space-y-3 text-sm font-sans min-w-0">
         {m.attachments && m.attachments.length > 0 && !imageUrl && (
           <div className="flex flex-wrap gap-1.5">
             {m.attachments.map((a, j) => (
