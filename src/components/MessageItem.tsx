@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  Bot, Sparkle, CheckCircle2, Layers, KeyRound, ChevronRight, Eye, ShieldCheck,
+  Sparkle, CheckCircle2, Layers, KeyRound, ChevronRight, Eye, ShieldCheck,
   Zap, Globe, Download, ImageIcon, FileText, Loader2, Play, Video
 } from "lucide-react";
 import { toast } from "sonner";
@@ -103,8 +103,19 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
       )}
 
       <div className="flex gap-3.5 md:gap-4">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-500 flex items-center justify-center text-white shrink-0 shadow-md mt-0.5 ring-2 ring-emerald-500/20">
-        <Bot className="w-4 h-4 text-white animate-pulse" />
+      <div className="shrink-0 mt-0.5 flex items-center justify-center" style={{ width: 32, height: 32 }}>
+        <div className="main" style={{ width: 32, height: 32, position: 'relative' }}>
+          <div className="loaders" style={{ width: 32, height: 32, position: 'relative' }}>
+            <div className="loader" /><div className="loader" /><div className="loader" />
+            <div className="loader" /><div className="loader" /><div className="loader" />
+            <div className="loader" /><div className="loader" /><div className="loader" />
+          </div>
+          <div className="loadersB" style={{ position: 'absolute', top: 0, left: 0, width: 32, height: 32 }}>
+            <div className="loaderA" /><div className="loaderA" /><div className="loaderA" />
+            <div className="loaderA" /><div className="loaderA" /><div className="loaderA" />
+            <div className="loaderA" /><div className="loaderA" /><div className="loaderA" />
+          </div>
+        </div>
       </div>
       
       <div className="flex-1 space-y-3 text-sm font-sans min-w-0">
