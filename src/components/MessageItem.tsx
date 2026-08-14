@@ -91,14 +91,23 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
     );
   }
 
+  const planSentences = m.plan ? m.plan.split("\n").filter(s => s.trim() !== "") : undefined;
+
   return (
-    <div className="flex gap-3.5 md:gap-4 animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
+    <div className="animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
+      {/* ThinkingReasoning - outside the bubble, standalone */}
+      {m.effort && m.effort !== "Low" && (
+        <div className="mb-2 pl-11 md:pl-12">
+          <ThinkingReasoning effort={m.effort} sentences={planSentences} />
+        </div>
+      )}
+
+      <div className="flex gap-3.5 md:gap-4">
       <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-500 flex items-center justify-center text-white shrink-0 shadow-md mt-0.5 ring-2 ring-emerald-500/20">
         <Bot className="w-4 h-4 text-white animate-pulse" />
       </div>
       
       <div className="flex-1 space-y-3 text-sm font-sans min-w-0">
-        <ThinkingReasoning effort={m.effort || "Medium"} plan={m.plan} isStreaming={isStreaming} />
 
         {m.attachments && m.attachments.length > 0 && !imageUrl && (
           <div className="flex flex-wrap gap-1.5">
@@ -329,6 +338,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             <span>Yapay zeka düşünüyor...</span>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

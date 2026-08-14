@@ -104,6 +104,133 @@ All colors MUST be HSL.
   }
 }
 
+/* ---- ThinkingReasoning Component ---- */
+
+@keyframes tr-block-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes tr-sentence-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes tr-shine {
+  0%, 18%   { background-position: 100% 0; }
+  82%, 100% { background-position: 0% 0; }
+}
+
+.trr-root {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  animation: tr-block-in 0.3s ease;
+}
+
+.trr-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+  user-select: none;
+}
+
+.trr-clickable {
+  cursor: pointer;
+}
+.trr-clickable:hover .trr-verb {
+  text-decoration: underline;
+}
+
+.trr-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.trr-verb {
+  font-weight: 700;
+}
+
+.trr-chevron {
+  color: hsl(var(--muted-foreground));
+  transition: transform 0.2s ease;
+}
+.trr-header[aria-expanded="true"] .trr-chevron {
+  transform: rotate(0deg);
+}
+.trr-header[aria-expanded="false"] .trr-chevron {
+  transform: rotate(180deg);
+}
+
+.trr-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground)) 0%,
+    hsl(var(--foreground)) 50%,
+    hsl(var(--muted-foreground)) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: tr-shine 2.2s ease-in-out infinite;
+}
+
+.trr-collapsible {
+  overflow: hidden;
+  transition: max-height 0.36s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              opacity 0.3s ease;
+  max-height: 500px;
+  opacity: 1;
+}
+.trr-collapsed {
+  max-height: 0;
+  opacity: 0;
+}
+
+.trr-inner {
+  padding-top: 6px;
+  padding-left: 2px;
+}
+
+.trr-viewport {
+  overflow: hidden;
+  position: relative;
+  transition: height 0.3s ease;
+}
+.trr-scroll {
+  overflow-y: auto;
+}
+
+.trr-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform 0.3s ease;
+}
+
+.trr-sentence {
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  line-height: 20px;
+  height: 40px;
+  color: hsl(var(--muted-foreground));
+  animation: tr-sentence-in 0.4s ease both;
+  border-left: 2px solid hsl(var(--border));
+  padding-left: 10px;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -118,4 +245,3 @@ All colors MUST be HSL.
     font-family: 'JetBrains Mono', monospace;
   }
 }
-

@@ -1,116 +1,112 @@
-import React, { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
 
+// The source ships this component with a CSS Module (ThinkingReasoning.module.css).
+// The class names below map 1:1 to the global stylesheet shipped alongside it; the
+// component JSX/logic is otherwise byte-faithful to the original.
 const styles = {
-  tr: "trr-root font-sans my-2 w-full max-w-2xl text-stone-700 dark:text-stone-300 select-none",
-  trHeader: "trr-header inline-flex items-center gap-1.5 text-xs text-stone-500 dark:text-stone-400 font-medium py-1 px-2.5 rounded-full border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 transition-all",
-  isClickable: "trr-clickable cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-800 dark:hover:text-stone-200",
-  trLabel: "trr-label flex items-center gap-1",
-  trVerb: "trr-verb font-semibold text-stone-700 dark:text-stone-300",
-  trChevron: "trr-chevron w-3.5 h-3.5 transition-transform duration-200",
-  trShimmer: "trr-shimmer animate-pulse text-amber-600 dark:text-amber-400",
-  trCollapsible: "trr-collapsible transition-all duration-300 overflow-hidden",
-  isCollapsed: "trr-collapsed max-h-0 opacity-0",
-  trInner: "trr-inner py-2",
-  trViewport: "trr-viewport overflow-hidden relative transition-all duration-300",
-  isScroll: "trr-scroll overflow-y-auto",
-  trStream: "trr-stream flex flex-col gap-1.5 transition-transform duration-300",
-  trSentence: "trr-sentence text-xs text-stone-600 dark:text-stone-400 leading-relaxed border-l-2 border-amber-400/80 dark:border-amber-500/80 pl-3 py-0.5",
+  tr: "trr-root",
+  trHeader: "trr-header",
+  isClickable: "trr-clickable",
+  trLabel: "trr-label",
+  trVerb: "trr-verb",
+  trChevron: "trr-chevron",
+  trShimmer: "trr-shimmer",
+  trCollapsible: "trr-collapsible",
+  isCollapsed: "trr-collapsed",
+  trInner: "trr-inner",
+  trViewport: "trr-viewport",
+  isScroll: "trr-scroll",
+  trStream: "trr-stream",
+  trSentence: "trr-sentence",
 } as const;
 
-const DEFAULT_SENTENCES = [
-  "Reading prompt requirements and analyzing intent...",
-  "Locating relevant files and checking architectural dependencies...",
-  "Evaluating constraints and planning optimal execution flow...",
-  "Generating step-by-step logic and ensuring clean UI components...",
-  "Refining structure, checking regression tests, and finalizing response...",
-];
-
-const SENT_H = 36;
-const GAP = 6;
-const MAX_H = 180;
-const FADE = 16;
+// Geometry — keep in sync with the CSS below.
+const SENT_H = 40; // 2 lines × 20px
+const GAP = 4;
+const MAX_H = 180; // viewport grows with content up to this, then scrolls
+const FADE = 16; // top/bottom fade once the viewport is capped
+const COLLAPSE_BEAT = 360;
 
 export interface ThinkingReasoningProps {
+  /** The actual thinking/plan text from the AI. Each line = one sentence. */
+  sentences?: string[];
+  /** Effort level: "Low" = no thinking, "Medium" = ~8s, "Max Effort" = ~15s */
   effort?: "Low" | "Medium" | "Max Effort" | string;
-  plan?: string;
-  isStreaming?: boolean;
-  onThinkingComplete?: () => void;
 }
 
-export function ThinkingReasoning({
-  effort = "Medium",
-  plan,
-  isStreaming = false,
-  onThinkingComplete,
-}: ThinkingReasoningProps) {
-  // If Low effort, no thinking delay
-  const isLowEffort = effort === "Low";
-  
-  // Sentences to display: use custom plan split or default sentences
-  const sentences = plan
-    ? plan.split("\n").filter((s) => s.trim() !== "")
-    : DEFAULT_SENTENCES;
+export function ThinkingReasoning({ sentences: propSentences, effort = "Medium" }: ThinkingReasoningProps) {
+  // Low effort = don't render at all
+  if (effort === "Low") return null;
 
-  // Delays based on effort level (Medium: ~8s, Max Effort: ~15s)
-  const targetDurationMs = effort === "Max Effort" ? 15000 : effort === "Medium" ? 8000 : 0;
-  const sentenceDelayMs = sentences.length > 0 ? Math.floor(targetDurationMs / sentences.length) : 1000;
+  const SENTENCES = propSentences && propSentences.length > 0
+    ? propSentences
+    : [
+        "İstek okunuyor ve mevcut bağlam analiz ediliyor...",
+        "İlgili dosyalar ve mimari bağımlılıklar kontrol ediliyor...",
+        "Kısıtlamalar değerlendiriliyor ve en uygun çalışma planı oluşturuluyor...",
+        "Adım adım mantık üretiliyor ve temiz bileşenler hazırlanıyor...",
+        "Yapı iyileştiriliyor, regresyon testleri kontrol ediliyor ve yanıt sonlandırılıyor...",
+      ];
 
-  const [phase, setPhase] = useState<"thinking" | "done">(isLowEffort ? "done" : "thinking");
-  const [revealed, setRevealed] = useState(isLowEffort ? sentences.length : 0);
+  // Target duration based on effort
+  const TARGET_MS = effort === "Max Effort" ? 15000 : 8000;
+
+  // Compute per-sentence delays that sum to TARGET_MS
+  const perSentence = Math.floor(TARGET_MS / SENTENCES.length);
+  const DELAYS = SENTENCES.map((_, i) =>
+    i === SENTENCES.length - 1
+      ? TARGET_MS - perSentence * (SENTENCES.length - 1)
+      : perSentence
+  );
+  const THINK_MS = DELAYS.reduce((a, b) => a + b, 0);
+
+  // "thinking" | "done"
+  const [phase, setPhase] = useState<"thinking" | "done">("thinking");
+  const [revealed, setRevealed] = useState(0);
+  const [elapsedS, setElapsedS] = useState(0);
+  // While thinking the reasoning is always open; once done it folds into
+  // the summary and the user can toggle it back open.
   const [open, setOpen] = useState(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // Which soft fades to show while scrolling the unfolded reasoning.
   const [fade, setFade] = useState({ top: false, bottom: true });
   const viewportRef = useRef<HTMLDivElement>(null);
-  const startTimeRef = useRef<number>(Date.now());
+  const startRef = useRef(Date.now());
 
   useEffect(() => {
-    if (isLowEffort) {
-      setRevealed(sentences.length);
-      setPhase("done");
-      setElapsedSeconds(0);
-      return;
-    }
+    startRef.current = Date.now();
 
-    startTimeRef.current = Date.now();
-    const intervalTimer = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      setElapsedSeconds(elapsed);
+    // Live elapsed counter
+    const tick = setInterval(() => {
+      setElapsedS(Math.floor((Date.now() - startRef.current) / 1000));
     }, 1000);
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    let accum = 0;
-
-    sentences.forEach((_, i) => {
-      accum += sentenceDelayMs;
-      timers.push(
-        setTimeout(() => {
-          setRevealed(i + 1);
-        }, accum)
-      );
-    });
-
-    const totalTimer = setTimeout(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setRevealed(SENTENCES.length);
       setPhase("done");
-      setElapsedSeconds(Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)));
-      clearInterval(intervalTimer);
-      onThinkingComplete?.();
-    }, Math.max(targetDurationMs, accum));
-
+      clearInterval(tick);
+      return;
+    }
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms));
+    let t = 0;
+    DELAYS.forEach((d, i) => {
+      t += d;
+      at(t, () => setRevealed(i + 1));
+    });
+    at(THINK_MS + COLLAPSE_BEAT, () => {
+      setPhase("done");
+      setElapsedS(Math.max(1, Math.round((Date.now() - startRef.current) / 1000)));
+      clearInterval(tick);
+    });
     return () => {
-      clearInterval(intervalTimer);
       timers.forEach(clearTimeout);
-      clearTimeout(totalTimer);
+      clearInterval(tick);
     };
-  }, [effort, isLowEffort, targetDurationMs, sentenceDelayMs, sentences.length]);
+  }, []);
 
-  if (isLowEffort) {
-    return null;
-  }
-
-  const done = phase === "done" && !isStreaming;
+  const done = phase === "done";
   const expanded = done ? open : true;
-  const count = done ? sentences.length : revealed;
+  const count = done ? SENTENCES.length : revealed;
   const contentH = count > 0 ? count * SENT_H + (count - 1) * GAP : 0;
   const capped = contentH > MAX_H;
   const viewH = capped ? MAX_H : contentH;
@@ -141,27 +137,29 @@ export function ThinkingReasoning({
     setOpen(next);
   };
 
+  const finalElapsed = done ? (elapsedS || Math.max(1, Math.round(THINK_MS / 1000))) : elapsedS;
+
   return (
     <div className={styles.tr}>
       <button
         type="button"
-        className={cn(styles.trHeader, done && styles.isClickable)}
+        className={styles.trHeader + (done ? " " + styles.isClickable : "")}
         aria-expanded={expanded}
         aria-label="Toggle thought"
         onClick={done ? toggle : undefined}
       >
         {done ? (
           <span className={styles.trLabel}>
-            <span className={styles.trVerb}>Düşünüldü</span> ({elapsedSeconds || 1}s)
+            <span className={styles.trVerb}>Düşünüldü</span> {finalElapsed} saniye
           </span>
         ) : (
-          <span className={cn(styles.trLabel, styles.trShimmer)}>
-            Düşünüyor{elapsedSeconds > 0 ? ` (${elapsedSeconds}s)` : ""}…
+          <span className={styles.trLabel + " " + styles.trShimmer}>
+            Düşünüyor{elapsedS > 0 ? ` (${elapsedS}s)` : ""}…
           </span>
         )}
         {done && (
           <svg
-            className={cn(styles.trChevron, open && "rotate-180")}
+            className={styles.trChevron}
             viewBox="0 0 24 24"
             width="12"
             height="12"
@@ -180,15 +178,16 @@ export function ThinkingReasoning({
       </button>
 
       <div
-        className={cn(
-          styles.trCollapsible,
-          !expanded && styles.isCollapsed
-        )}
+        className={
+          styles.trCollapsible + (expanded ? "" : " " + styles.isCollapsed)
+        }
       >
         <div className={styles.trInner}>
           <div
             ref={viewportRef}
-            className={cn(styles.trViewport, scrollable && styles.isScroll)}
+            className={
+              styles.trViewport + (scrollable ? " " + styles.isScroll : "")
+            }
             style={{
               height: `${viewH}px`,
               WebkitMaskImage: mask,
@@ -200,7 +199,7 @@ export function ThinkingReasoning({
               className={styles.trStream}
               style={{ transform: `translateY(${translate}px)` }}
             >
-              {sentences.slice(0, count).map((line, i) => (
+              {SENTENCES.slice(0, count).map((line, i) => (
                 <p key={i} className={styles.trSentence}>
                   {line}
                 </p>
