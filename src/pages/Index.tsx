@@ -1122,13 +1122,13 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
   async function autoPublish(htmlCode: string, sId?: string) {
     setPublishing(true);
     setScreenshot(null);
-    log("info", "🚀 Site Cloudflare R2 üzerinden yayına alınıyor...");
+    log("info", "🚀 Site Netlify üzerinden yayına alınıyor...");
     try {
       const targetId = sId || siteId || safeUUID();
       const cfUrl = await publishToCloudflareR2(htmlCode, targetId);
       setPublishedUrl(cfUrl);
-      log("success", `🌍 Cloudflare R2 ile Yayında: ${cfUrl}`);
-      toast.success("Site Cloudflare ile yayında — tüm dünyaya açık!");
+      log("success", `🌍 Netlify ile Yayında: ${cfUrl}`);
+      toast.success("Site Netlify ile yayında — tüm dünyaya açık!");
 
       log("info", "📸 Ekran görüntüsü alınıyor...");
       let screenshotUrl: string | null = null;

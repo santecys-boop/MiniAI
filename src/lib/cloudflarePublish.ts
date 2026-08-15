@@ -1,12 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export const NETLIFY_DOMAIN = "https://radiant-liger-e14789.netlify.app";
+
 export async function publishToCloudflareR2(htmlCode: string, siteId: string): Promise<string> {
-  const supabaseUrl = import.meta.env.VITE_AI_SUPABASE_URL || 'https://dhryhmkhdelwuzowyjbo.supabase.co';
-  
-  // 1. Canlı URL: Netlify / Host domaini üzerinden /site/:id veya doğrudan view-site Edge Function
-  const liveUrl = typeof window !== 'undefined' && window.location.origin.startsWith('http')
-    ? `${window.location.origin}/site/${siteId}`
-    : `${supabaseUrl}/functions/v1/view-site/${siteId}`;
+  // 1. Canlı URL: radiant-liger-e14789.netlify.app/site/:id üzerinden
+  const isCustomDomain = typeof window !== 'undefined' && window.location.origin.startsWith('http') && !window.location.origin.includes('localhost');
+  const baseDomain = isCustomDomain ? window.location.origin : NETLIFY_DOMAIN;
+  const liveUrl = `${baseDomain}/site/${siteId}`;
 
   try {
     const bytes = new TextEncoder().encode(htmlCode);

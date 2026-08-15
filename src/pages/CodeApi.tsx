@@ -228,9 +228,9 @@ export default function CodeApi() {
   "ok": true,
   "type": "html",
   "id": "site_7f28a9b1",
-  "url": "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/sites/site_7f28a9b1/index.html",
+  "url": "https://radiant-liger-e14789.netlify.app/site/site_7f28a9b1",
   "code": "<!DOCTYPE html><html>...</html>",
-  "message": "Web siteniz Cloudflare R2 üzerinde başarıyla oluşturuldu."
+  "message": "Web siteniz Netlify altyapısı üzerinde başarıyla oluşturuldu."
 }` : `{
   "ok": true,
   "type": "chat",
