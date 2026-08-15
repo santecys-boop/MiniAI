@@ -958,6 +958,8 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
       if (textFiles.length > 0) {
         const fileBlocks = textFiles.map(f => `[KULLANICININ YÜKLEDİĞİ DOSYA: ${f.name}]\n${f.data}\n[/KULLANICININ YÜKLEDİĞİ DOSYA]`).join("\n\n");
         promptToSend += `\n\n${fileBlocks}\n\n[KRİTİK TALİMAT]: Yüklenen dosya(lar)ın içeriğini dikkatle analiz et. Kullanıcının sorusu veya isteği doğrultusunda tam içeriği oluştur ve [FILE:${textFiles[0].name}]...[/FILE] etiketiyle eksiksiz olarak çıktı ver.`;
+      } else if (!isImageOnly) {
+        promptToSend += `\n\n[KRİTİK MİMARİ TALİMATI - KESİNLİKLE ÇOKLU DOSYA JSON YAP]:\nBu isteği tek bir HTML dosyası veya düz metin olarak YAZMA!\nLovable standardında tam yığın çoklu dosya (src/App.jsx, src/components/Navbar.jsx, src/pages/Home.jsx, src/pages/Dashboard.jsx, src/index.css ve database.sql_queries) içeren geçerli tek bir JSON objesi döndür!`;
       }
 
       if (useAgent) {

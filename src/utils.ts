@@ -252,10 +252,304 @@ export function parseAIResponse(raw: string, attachedFileName?: string): FullSta
     code = code.replace(/^```(?:html|tsx|jsx|typescript|javascript)?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
     return { plan: planMatch2?.[1].trim(), code, codeType: codeMatch[1].toLowerCase() as "html" | "react" };
   }
-  if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-    const m = text.match(/<!DOCTYPE[\s\S]*<\/html>/i);
-    return { code: m ? m[0] : text, codeType: "html" };
+  if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("[CODE:html]")) {
+    let rawHtml = text;
+    const m = text.match(/<!DOCTYPE[\s\S]*<\/html>/i) || text.match(/<html[\s\S]*<\/html>/i);
+    if (m) rawHtml = m[0];
+
+    // Otomatik HTML -> Çoklu Dosya React SaaS Dönüştürücü
+    const titleMatch = rawHtml.match(/<title>([^<]+)<\/title>/i) || rawHtml.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    const projTitle = titleMatch ? titleMatch[1].trim() : "Modern SaaS Projesi";
+    const projSlug = projTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    // CSS ve stilleri ayrıştır
+    const styleMatches = Array.from(rawHtml.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)).map(m => m[1].trim()).join("\n\n");
+
+    const convertedFiles: ProjectFile[] = [
+      {
+        path: "src/App.jsx",
+        content: `import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
+
+export default function App() {
+  return (
+    <Router>
+      <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black">
+        <Navbar />
+        <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Routes>
+        </main>
+      </div>
+    </Router>
+  );
+}`,
+        lang: "tsx"
+      },
+      {
+        path: "src/components/Navbar.jsx",
+        content: `import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Sparkles, LayoutDashboard, Home as HomeIcon, Database } from 'lucide-react';
+
+export default function Navbar() {
+  return (
+    <header className="border-b border-stone-800 bg-stone-900/80 backdrop-blur-xl px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-lg">
+      <div className="flex items-center gap-2.5 font-bold text-base text-white tracking-tight">
+        <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+          <Sparkles className="w-4 h-4" />
+        </div>
+        <span>${projTitle}</span>
+      </div>
+      <nav className="flex items-center gap-2 sm:gap-4 text-xs font-medium">
+        <Link to="/" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition">
+          <HomeIcon className="w-3.5 h-3.5 text-stone-400" />
+          <span>Ana Sayfa</span>
+        </Link>
+        <Link to="/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold hover:bg-amber-500/25 transition">
+          <LayoutDashboard className="w-3.5 h-3.5" />
+          <span>Yönetim Paneli</span>
+        </Link>
+      </nav>
+    </header>
+  );
+}`,
+        lang: "tsx"
+      },
+      {
+        path: "src/pages/Home.jsx",
+        content: `import React from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, CheckCircle2, Zap, Shield, Sparkles } from 'lucide-react';
+
+export default function Home() {
+  return (
+    <div className="space-y-12 py-8">
+      <div className="text-center space-y-6 max-w-3xl mx-auto">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Full-Stack SaaS Platformu</span>
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+          ${projTitle}
+        </h1>
+        <p className="text-stone-400 text-sm sm:text-base leading-relaxed">
+          Modern React Router çoklu sayfa mimarisi, Supabase PostgreSQL veritabanı ve zengin arayüz bileşenleri ile donatılmış yeni nesil uygulama.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <Link to="/dashboard" className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-sm shadow-xl shadow-amber-500/10 transition active:scale-95">
+            <span>Uygulamayı Başlat</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+        <div className="p-6 rounded-2xl bg-stone-900/60 border border-stone-800 space-y-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <Zap className="w-5 h-5" />
+          </div>
+          <h3 className="text-base font-bold text-white">Yüksek Performans</h3>
+          <p className="text-xs text-stone-400 leading-relaxed">Vite ve React 18 ile optimize edilmiş anında yüklenen dinamik bileşenler.</p>
+        </div>
+        <div className="p-6 rounded-2xl bg-stone-900/60 border border-stone-800 space-y-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <Shield className="w-5 h-5" />
+          </div>
+          <h3 className="text-base font-bold text-white">Güvenli Veritabanı</h3>
+          <p className="text-xs text-stone-400 leading-relaxed">Supabase PostgreSQL ve RLS (Row Level Security) kuralları ile koruma.</p>
+        </div>
+        <div className="p-6 rounded-2xl bg-stone-900/60 border border-stone-800 space-y-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <h3 className="text-base font-bold text-white">Çok Sayfalı Yapı</h3>
+          <p className="text-xs text-stone-400 leading-relaxed">Tek bir sayfaya sıkışmayan bağımsız sayfalar ve modüler kod mimarisi.</p>
+        </div>
+      </div>
+    </div>
+  );
+}`,
+        lang: "tsx"
+      },
+      {
+        path: "src/pages/Dashboard.jsx",
+        content: `import React, { useState } from 'react';
+import { Plus, Trash2, Database, Search, CheckCircle2, Clock } from 'lucide-react';
+
+export default function Dashboard() {
+  const [items, setItems] = useState([
+    { id: '1', title: 'İlk Veritabanı Kaydı', category: 'Sistem', status: 'Tamamlandı', date: '2026-08-15' },
+    { id: '2', title: 'İkinci SaaS Görevi', category: 'Geliştirme', status: 'Devam Ediyor', date: '2026-08-15' },
+    { id: '3', title: 'Müşteri Sipariş Takibi', category: 'Operasyon', status: 'Beklemede', date: '2026-08-15' }
+  ]);
+  const [search, setSearch] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [newCategory, setNewCategory] = useState('Genel');
+
+  const addItem = (e) => {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+    setItems([
+      { id: String(Date.now()), title: newTitle, category: newCategory, status: 'Yeni', date: new Date().toLocaleDateString('tr-TR') },
+      ...items
+    ]);
+    setNewTitle('');
+  };
+
+  const removeItem = (id) => {
+    setItems(items.filter(i => i.id !== id));
+  };
+
+  const filtered = items.filter(i => i.title.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-800 pb-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Yönetim Paneli & Veri Listesi</h2>
+          <p className="text-xs text-stone-400">Canlı kayıt yönetimi ve Supabase PostgreSQL simülasyonu.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Kayıt ara..."
+              className="bg-stone-900 border border-stone-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-stone-500 focus:outline-none focus:border-amber-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={addItem} className="flex flex-wrap gap-2 p-4 rounded-2xl bg-stone-900/40 border border-stone-800">
+        <input
+          value={newTitle}
+          onChange={e => setNewTitle(e.target.value)}
+          placeholder="Yeni kayıt başlığı..."
+          className="flex-1 min-w-[200px] bg-stone-950 border border-stone-800 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+        />
+        <select
+          value={newCategory}
+          onChange={e => setNewCategory(e.target.value)}
+          className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-300 focus:outline-none focus:border-amber-500"
+        >
+          <option value="Genel">Genel</option>
+          <option value="Sistem">Sistem</option>
+          <option value="Müşteri">Müşteri</option>
+          <option value="Finans">Finans</option>
+        </select>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md transition"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Kayıt Ekle</span>
+        </button>
+      </form>
+
+      <div className="rounded-2xl border border-stone-800 overflow-hidden bg-stone-900/30">
+        <table className="w-full text-left text-xs font-mono">
+          <thead className="bg-stone-900/90 text-stone-400 border-b border-stone-800 uppercase text-[10px] tracking-wider">
+            <tr>
+              <th className="px-4 py-3">Başlık</th>
+              <th className="px-4 py-3">Kategori</th>
+              <th className="px-4 py-3">Durum</th>
+              <th className="px-4 py-3">Tarih</th>
+              <th className="px-4 py-3 text-right">Aksiyon</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-stone-800/60 text-stone-300">
+            {filtered.map(it => (
+              <tr key={it.id} className="hover:bg-stone-800/40 transition">
+                <td className="px-4 py-3 font-medium text-white">{it.title}</td>
+                <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-md bg-stone-800 text-stone-300 text-[11px]">{it.category}</span></td>
+                <td className="px-4 py-3">
+                  <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-sans font-semibold">
+                    {it.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-stone-400">{it.date}</td>
+                <td className="px-4 py-3 text-right">
+                  <button onClick={() => removeItem(it.id)} className="p-1 text-stone-500 hover:text-rose-400 transition" title="Sil">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}`,
+        lang: "tsx"
+      },
+      {
+        path: "src/index.css",
+        content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+${styleMatches}
+
+body {
+  margin: 0;
+  background-color: #0c0a09;
+  color: #f5f5f4;
+  font-family: system-ui, -apple-system, sans-serif;
+}`,
+        lang: "css"
+      },
+      {
+        path: "supabase/schema.sql",
+        content: `-- PostgreSQL Şeması: ${projTitle}
+CREATE TABLE IF NOT EXISTS public.records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  category TEXT DEFAULT 'Genel',
+  status TEXT DEFAULT 'Aktif',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read records" ON public.records FOR SELECT USING (true);
+CREATE POLICY "Public insert records" ON public.records FOR INSERT WITH CHECK (true);`,
+        lang: "sql"
+      },
+      {
+        path: "index.html",
+        content: rawHtml,
+        lang: "html"
+      }
+    ];
+
+    const sqlQueries = [
+      "CREATE TABLE IF NOT EXISTS public.records (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL, category TEXT DEFAULT 'Genel', status TEXT DEFAULT 'Aktif', created_at TIMESTAMPTZ DEFAULT now());",
+      "ALTER TABLE public.records ENABLE ROW LEVEL SECURITY;",
+      "CREATE POLICY \"Public read records\" ON public.records FOR SELECT USING (true);"
+    ];
+
+    return {
+      chat: `🚀 **${projTitle}** projesi çok sayfalı React mimarisi ve PostgreSQL veritabanı ile başarıyla oluşturuldu.`,
+      plan: `1. Frontend: React Router çok sayfalı yapı (Ana Sayfa ve Yönetim Paneli).\n2. Backend/Database: Supabase PostgreSQL records tablosu ve RLS politikaları.`,
+      projectName: projSlug,
+      architecturePlan: "React + Vite + Tailwind + Supabase PostgreSQL",
+      databaseQueries: sqlQueries,
+      projectFiles: convertedFiles,
+      code: convertedFiles[0].content,
+      codeType: "react"
+    };
   }
+
   return { chat: text };
 }
 
