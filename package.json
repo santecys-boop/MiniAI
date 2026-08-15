@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "deploy": "yarn build && wrangler deploy",
+    "deploy:surge": "yarn build && SURGE_LOGIN=miniaiapp_official@proton.me SURGE_TOKEN=e6b56f8470f225ff3df331fd4f542cd3 surge dist miniaii.surge.sh",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
