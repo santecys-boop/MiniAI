@@ -3,6 +3,24 @@
   publish = "dist"
 
 [[redirects]]
+  from = "/api/generate"
+  to = "https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/generate-site"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/generate/*"
+  to = "https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/generate-site"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

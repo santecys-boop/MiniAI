@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useState } from "react";
 
-const ENDPOINT = typeof window !== "undefined" ? `${window.location.origin}/api/generate` : "https://api.miniai.dev/generate";
+const ENDPOINT = "https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/generate-site";
 
 const curlExample = `curl -X POST "${ENDPOINT}" \\
   -H "Authorization: Bearer mini_xxxxxxxxxxxxxxxx" \\
