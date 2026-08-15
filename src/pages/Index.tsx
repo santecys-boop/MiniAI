@@ -966,7 +966,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         log("success", `🏆 Jüri seçti: Aday #${data.winner} — ${data.reason}`);
         allCandidates = data.candidates;
         const winnerText = data.candidates.find((c: any) => c.idx === data.winner)?.text || data.candidates[0].text;
-        parsed = parseAIResponse(winnerText);
+        parsed = parseAIResponse(winnerText, textFiles[0]?.name);
         setAgentAlts(data.candidates);
         setAgentCurrent(data.winner - 1);
       } else {
@@ -984,7 +984,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         });
         const data = await resp.json();
         if (data.error) throw new Error(data.error);
-        parsed = parseAIResponse(data.text);
+        parsed = parseAIResponse(data.text, textFiles[0]?.name);
         setAgentAlts(null);
       }
       const projApiKey = generateProjectApiKey();

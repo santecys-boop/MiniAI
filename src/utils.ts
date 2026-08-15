@@ -103,25 +103,45 @@ export function parseMultiFileResponse(raw: string): { chat?: string; plan?: str
   let chat = "";
   let plan = "";
   
-  const chatMatch = raw.match(/\[CHAT\]\s*([\s\S]*?)(?=\[FILE:|\[PLAN\]|\[CODE:|$)/i);
+  const chatMatch = raw.match(/\[CHAT\]\s*([\s\S]*?)(?=\[FILE:|\[PLAN\]|\[CODE:|```(?:file:|[\w]+\.[\w]+)|$)/i);
   if (chatMatch) chat = chatMatch[1].trim();
   else {
-    // If no explicit [CHAT] tag, take the text before the first [FILE:
-    const preFileMatch = raw.match(/^([\s\S]*?)(?=\[FILE:|\[PLAN\]|\[CODE:)/i);
+    const preFileMatch = raw.match(/^([\s\S]*?)(?=\[FILE:|\[PLAN\]|\[CODE:|```(?:file:|[\w]+\.[\w]+))/i);
     if (preFileMatch && preFileMatch[1].trim()) chat = preFileMatch[1].trim();
   }
   
   const planMatch = raw.match(/\[PLAN\]\s*([\s\S]*?)(?=\[FILE:|\[CODE:|$)/i);
   if (planMatch) plan = planMatch[1].trim();
 
-  const fileRegex = /\[FILE:([^\]]+)\]\s*([\s\S]*?)(?=\[\/FILE\]|\[FILE:|$)/gi;
+  // 1. [FILE:dosya_adi.ext] ... [/FILE] or [FILE:dosya_adi.ext]
+  const fileRegex = /\[FILE:([^\]\n\r]+)\]\s*([\s\S]*?)(?=\[\/FILE\]|\[FILE:|$)/gi;
   let match;
   while ((match = fileRegex.exec(raw)) !== null) {
     let content = match[2].trim();
     content = content.replace(/\[\/FILE\]/gi, "").trim();
     content = content.replace(/^```[\w]*\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     const path = match[1].trim();
-    if (path && content) {
+    if (path && content && !files.some(f => f.path === path)) {
+      files.push({ path, content, lang: getLangFromPath(path) });
+    }
+  }
+
+  // 2. ```file:dosya_adi.ext or ```txt:dosya_adi.txt or ```dosya_adi.txt
+  const fencedFileRegex = /```(?:file:|[\w]+:)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)\s*\n([\s\S]*?)```/gi;
+  while ((match = fencedFileRegex.exec(raw)) !== null) {
+    const path = match[1].trim();
+    const content = match[2].trim();
+    if (path && content && !files.some(f => f.path === path)) {
+      files.push({ path, content, lang: getLangFromPath(path) });
+    }
+  }
+
+  // 3. ### Dosya: dosya_adi.ext or **Dosya: dosya_adi.ext** followed by ```...```
+  const headerFileRegex = /(?:###|\*\*|#)\s*(?:Dosya|File)?\s*:?\s*([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)\s*(?:\*\*)?\s*\n+```[\w]*\s*\n([\s\S]*?)```/gi;
+  while ((match = headerFileRegex.exec(raw)) !== null) {
+    const path = match[1].trim();
+    const content = match[2].trim();
+    if (path && content && !files.some(f => f.path === path)) {
       files.push({ path, content, lang: getLangFromPath(path) });
     }
   }
@@ -131,19 +151,32 @@ export function parseMultiFileResponse(raw: string): { chat?: string; plan?: str
   return { chat: chat || undefined, plan: plan || undefined, files, mainHtml: htmlFile?.content };
 }
 
-export function parseAIResponse(raw: string): { chat?: string; plan?: string; code?: string; codeType?: "html" | "react"; projectFiles?: ProjectFile[] } {
+export function parseAIResponse(raw: string, attachedFileName?: string): { chat?: string; plan?: string; code?: string; codeType?: "html" | "react"; projectFiles?: ProjectFile[] } {
   let text = raw.trim();
   
-  if (text.includes("[FILE:")) {
-    const multi = parseMultiFileResponse(text);
-    if (multi.files.length > 0) {
-      const hasHtml = !!multi.mainHtml;
+  const multi = parseMultiFileResponse(text);
+  if (multi.files.length > 0) {
+    const hasHtml = !!multi.mainHtml;
+    return {
+      chat: multi.chat,
+      plan: multi.plan,
+      code: multi.mainHtml || (hasHtml ? multi.files[0].content : undefined),
+      codeType: hasHtml ? (multi.mainHtml ? "html" : (multi.files[0].lang === "tsx" ? "react" : "html")) : undefined,
+      projectFiles: multi.files,
+    };
+  }
+
+  // Fallback: If user attached a file or asked for a file, and model returned a fenced code block without HTML:
+  const codeBlockMatch = text.match(/```([\w]*)\s*\n([\s\S]*?)```/);
+  if (codeBlockMatch && !text.includes("<!DOCTYPE") && !text.includes("<html")) {
+    const blockLang = codeBlockMatch[1].trim().toLowerCase();
+    const blockContent = codeBlockMatch[2].trim();
+    if (attachedFileName || blockLang === "txt" || blockLang === "python" || blockLang === "py" || blockLang === "json" || blockLang === "csv" || blockLang === "sql") {
+      const fileName = attachedFileName || (blockLang === "python" || blockLang === "py" ? "script.py" : blockLang === "json" ? "data.json" : blockLang === "csv" ? "table.csv" : "dosya.txt");
+      const cleanChat = text.replace(/```[\w]*\s*\n[\s\S]*?```/g, "").replace(/\[CHAT\]/gi, "").trim();
       return {
-        chat: multi.chat,
-        plan: multi.plan,
-        code: multi.mainHtml || (hasHtml ? multi.files[0].content : undefined),
-        codeType: hasHtml ? (multi.mainHtml ? "html" : (multi.files[0].lang === "tsx" ? "react" : "html")) : undefined,
-        projectFiles: multi.files,
+        chat: cleanChat || "Dosyanız başarıyla oluşturuldu/düzenlendi.",
+        projectFiles: [{ path: fileName, content: blockContent, lang: getLangFromPath(fileName) }]
       };
     }
   }
