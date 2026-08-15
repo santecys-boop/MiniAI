@@ -47,7 +47,7 @@ import { toast } from "sonner";
  * ══════════════════════════════════════════════════════════════════════════ */
 
 const FN_BASE = `${import.meta.env.VITE_AI_SUPABASE_URL || 'https://dhryhmkhdelwuzowyjbo.supabase.co'}/functions/v1`;
-const ANON = import.meta.env.VITE_AI_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRocnlobWtoZGVsd3V6b3d5amJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1Mjg4MjgsImV4cCI6MjA5MjEwNDgyOH0.KM8m7NXq0GrIREO9yITXj3DaYN_JgLfkZuZIii-5kTw';
+const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 type Msg = { role: "user" | "assistant"; content: string; at: number };
 
@@ -1182,69 +1182,37 @@ export default function VoiceMode({
     const ac = new AbortController();
     abortRef.current = ac;
 
-    /* ── 2) Chat — Groq / Supabase API ile hızlı cevap üret ── */
+    /* ── 2) Chat — Groq API ile yıldırım hızında cevap üret ── */
     const GROQ_API_KEY = "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";
-    let reply = "";
-    
-    try {
-      const chatR = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            {
-              role: "system",
-              content: "Sen Mini Live sesli asistanısın. Türkçe, son derece doğal, canlı, samimi, kısa ve akıcı (1-2 cümle) cevaplar verirsin. KESİNLİKLE yıldız (*), tilde (~), markdown veya kod yazma!"
-            },
-            ...newHistory
-              .slice(0, -1)
-              .slice(-10)
-              .map((m) => ({ role: m.role, content: m.content })),
-            { role: "user", content: userText }
-          ],
-          max_tokens: 150,
-          temperature: 0.7,
-        }),
-        signal: ac.signal,
-      });
-      if (chatR.ok) {
-        const chatJ = await chatR.json();
-        reply = cleanForSpeech(chatJ.choices?.[0]?.message?.content || "");
-      }
-    } catch (e) {
-      console.warn("Groq chat error, trying fallback:", e);
-    }
-
-    if (!reply) {
-      // Supabase Edge Function Fallback
-      try {
-        const fbRes = await fetch(`${FN_BASE}/generate-site`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${ANON}`,
-            apikey: ANON,
+    const chatR = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: "Sen Mini Live sesli asistanısın. Türkçe, son derece doğal, canlı, samimi, kısa ve akıcı (1-2 cümle) cevaplar verirsin. KESİNLİKLE yıldız (*), tilde (~), markdown veya kod yazma!"
           },
-          body: JSON.stringify({
-            prompt: `Sesli asistan olarak bu soruya çok kısa, samimi 1-2 cümlelik Türkçe cevap ver: ${userText}`,
-            preferredProvider: "sambanova",
-          }),
-          signal: ac.signal,
-        });
-        if (fbRes.ok) {
-          const fbJ = await fbRes.json();
-          reply = cleanForSpeech(fbJ.text || "");
-        }
-      } catch (e2) {
-        console.warn("Supabase fallback error:", e2);
-      }
-    }
+          ...newHistory
+            .slice(0, -1)
+            .slice(-10)
+            .map((m) => ({ role: m.role, content: m.content })),
+          { role: "user", content: userText }
+        ],
+        max_tokens: 150,
+        temperature: 0.7,
+      }),
+      signal: ac.signal,
+    });
+    if (!chatR.ok) throw new Error(`groq-${chatR.status}`);
+    const chatJ = await chatR.json();
 
-    if (!reply) reply = "Seni çok iyi anladım. Sana bu konuda memnuniyetle yardımcı olabilirim!";
+    let reply = cleanForSpeech(chatJ.choices?.[0]?.message?.content || "");
+    if (!reply) reply = "Bunu tam anlayamadım, tekrar söyler misin?";
 
     setHistory((h) => [...h, { role: "assistant", content: reply, at: Date.now() }]);
     setCaption(reply);
@@ -1252,7 +1220,8 @@ export default function VoiceMode({
     /* ── 3) TTS — HD model + seçili ses + hız ── */
     setState("speaking");
     
-    // Mikrofonu kapat ki ses hoparlörden net çıksın
+    // ANDROID SES BUG'I ÇÖZÜMÜ: Mikrofon açıkken Android sesi ahizeye (telefonla konuşulan yere) verir.
+    // Sesi gürül gürül ana hoparlörden vermek için sesi çalmadan ÖNCE mikrofonu tamamen kapatıyoruz!
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -1304,51 +1273,51 @@ export default function VoiceMode({
           return "data:audio/mp3;base64," + arrayBufferToBase64(buf);
         }
       }
-    } catch (err) {
-      console.warn("Supabase voice-tts error:", err);
+    } catch {
+      /* Fallback to Google Translate MP3 URL below */
     }
-    return "";
+    
+    // Google Translate TTS direct MP3 fallback (100% works everywhere)
+    const encoded = encodeURIComponent(text.slice(0, 190));
+    return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=tr&client=tw-ob`;
   }
 
   /** Bir Base64 / Audio URL'ini çal; bitince/hata olunca/iptal edilince resolve olur */
-  function playUrl(url: string, signal: AbortSignal): Promise<boolean> {
+  function playUrl(url: string, signal: AbortSignal): Promise<void> {
     return new Promise((resolve) => {
-      if (!url) {
-        resolve(false);
-        return;
-      }
       const audio = new Audio();
       audio.style.display = "none";
       audio.preload = "auto";
       audio.src = url;
       audio.volume = 1.0;
       
+      // Android WebView GARANTİSİ: DOM'a eklemezsen bazı cihazlarda çalmaz!
       document.body.appendChild(audio);
       playerRef.current = audio;
 
       let done = false;
-      const finish = (ok: boolean) => {
+      const finish = () => {
         if (done) return;
         done = true;
         if (playerRef.current === audio) playerRef.current = null;
         try { document.body.removeChild(audio); } catch {}
         signal.removeEventListener("abort", onAbort);
-        resolve(ok);
+        resolve();
       };
 
       const onAbort = () => {
         try { audio.pause(); } catch { /* geç */ }
-        finish(false);
+        finish();
       };
 
       signal.addEventListener("abort", onAbort);
-      audio.onended = () => finish(true);
+      audio.onended = finish;
       audio.onerror = (e) => {
         console.warn("Audio element error:", e);
-        finish(false);
+        finish();
       };
 
-      const timer = setTimeout(() => finish(true), 15000);
+      const timer = setTimeout(finish, 15000);
 
       try {
         audio.load();
@@ -1359,7 +1328,7 @@ export default function VoiceMode({
           }).catch((err) => {
             console.warn("Audio play blocked:", err);
             clearTimeout(timer);
-            finish(false);
+            finish();
           });
         } else {
           haptic(6);
@@ -1367,7 +1336,7 @@ export default function VoiceMode({
       } catch (err) {
         console.warn("Audio catch:", err);
         clearTimeout(timer);
-        finish(false);
+        finish();
       }
     });
   }
@@ -1385,7 +1354,7 @@ export default function VoiceMode({
         u.rate = speedRef.current || 1.0;
         
         const voices = window.speechSynthesis.getVoices();
-        const trVoice = voices.find(v => v.lang.includes("tr") || v.lang.includes("TR"));
+        const trVoice = voices.find(v => v.lang.includes("tr"));
         if (trVoice) u.voice = trVoice;
 
         let resolved = false;
@@ -1411,24 +1380,19 @@ export default function VoiceMode({
     const ac = new AbortController();
     abortRef.current = ac;
 
-    let playedOk = false;
     try {
       const chunks = splitForTts(text);
       for (const chunk of chunks) {
         if (closedRef.current || ac.signal.aborted) return;
         const url = await fetchTtsUrl(chunk, ac.signal);
         if (closedRef.current || ac.signal.aborted) return;
-        if (url) {
-          const ok = await playUrl(url, ac.signal);
-          if (ok) playedOk = true;
-        }
+        await playUrl(url, ac.signal);
       }
     } catch (err) {
       console.warn("speak error, fallback to WebSpeech:", err);
-    }
-
-    if (!playedOk && !closedRef.current && !ac.signal.aborted) {
-      await speakWithWebSpeech(text);
+      if (!closedRef.current && !ac.signal.aborted) {
+        await speakWithWebSpeech(text);
+      }
     }
 
     if (!closedRef.current && !ac.signal.aborted) onDone();

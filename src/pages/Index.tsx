@@ -43,38 +43,6 @@ const GOOGLE_CLIENT_ID = "930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.goo
 
 export async function handleGoogleLogin() {
   try {
-    // 1. Google Identity Services (Popup Flow - redirect_uri_mismatch hatasını engeller)
-    if (typeof (window as any).google !== "undefined" && (window as any).google.accounts?.oauth2) {
-      const client = (window as any).google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: "openid email profile",
-        callback: async (tokenResponse: any) => {
-          if (tokenResponse && tokenResponse.access_token) {
-            try {
-              const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-                headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
-              });
-              const profile = await res.json();
-              const googleUser = {
-                id: profile.sub,
-                email: profile.email,
-                name: profile.name || profile.email.split("@")[0],
-                avatar: profile.picture,
-              };
-              localStorage.setItem("mini_ai_google_user", JSON.stringify(googleUser));
-              toast.success(`Google ile giriş başarılı! Hoş geldin ${googleUser.name}`);
-              setTimeout(() => window.location.reload(), 500);
-            } catch (e: any) {
-              toast.error("Google kullanıcı bilgileri alınamadı: " + e.message);
-            }
-          }
-        },
-      });
-      client.requestAccessToken();
-      return;
-    }
-
-    // 2. Standart OAuth Redirect Fallback
     const redirectUri = window.location.origin;
     const targetUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${GOOGLE_CLIENT_ID}&` +
@@ -242,7 +210,7 @@ const FN_BASE = `${import.meta.env.VITE_AI_SUPABASE_URL || 'https://dhryhmkhdelw
 const ANON = import.meta.env.VITE_AI_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRocnlobWtoZGVsd3V6b3d5amJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1Mjg4MjgsImV4cCI6MjA5MjEwNDgyOH0.KM8m7NXq0GrIREO9yITXj3DaYN_JgLfkZuZIii-5kTw';
 
 export default function Index() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState("sambanova");
@@ -291,7 +259,6 @@ export default function Index() {
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [generatedBatch, setGeneratedBatch] = useState<string[]>([]);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
-  const [infoModalOpen, setInfoModalOpen] = useState(true);
   const [selectedFileIdx, setSelectedFileIdx] = useState<number>(0);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
@@ -443,16 +410,9 @@ export default function Index() {
     toast.success(`Hoş geldin${onboard.name ? ", " + onboard.name : ""}! 🚀`);
   }
 
-  const getUserStorageKey = useCallback(() => {
-    if (user?.id) return `mini_ai_sites_user_${user.id}`;
-    if (user?.email) return `mini_ai_sites_user_${user.email}`;
-    return "mini_ai_sites_guest";
-  }, [user]);
-
   async function loadHistory() {
     try {
-      const key = getUserStorageKey();
-      const localData = localStorage.getItem(key);
+      const localData = localStorage.getItem("mini_ai_sites_history");
       if (localData) {
         const parsed = JSON.parse(localData);
         setHistoryList(parsed);
@@ -462,36 +422,6 @@ export default function Index() {
     } catch (err) {
       console.error("loadHistory error:", err);
       setHistoryList([]);
-    }
-  }
-
-  function saveProjectLocally(site: SiteRow) {
-    try {
-      const key = getUserStorageKey();
-      const localData = localStorage.getItem(key);
-      const list: SiteRow[] = localData ? JSON.parse(localData) : [];
-      const updated = [site, ...list.filter(s => s.id !== site.id)].slice(0, 50);
-      localStorage.setItem(key, JSON.stringify(updated));
-      setHistoryList(updated);
-    } catch (e) {
-      console.error("saveProjectLocally error:", e);
-    }
-  }
-
-  function deleteProjectFromHistory(e: React.MouseEvent, id: string) {
-    e.stopPropagation();
-    try {
-      const key = getUserStorageKey();
-      const localData = localStorage.getItem(key);
-      if (localData) {
-        const list: SiteRow[] = JSON.parse(localData);
-        const updated = list.filter(s => s.id !== id);
-        localStorage.setItem(key, JSON.stringify(updated));
-        setHistoryList(updated);
-        toast.success("Proje geçmişten silindi");
-      }
-    } catch (err) {
-      console.error("deleteProjectFromHistory error:", err);
     }
   }
 
@@ -711,20 +641,20 @@ export default function Index() {
         const { generateImageWithStableHorde } = await import("../lib/stableHordeService");
         const imgUrl = await generateImageWithStableHorde(promptToGen);
         
-        const imgProjectId = `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        const imgSiteItem: SiteRow = {
-          id: imgProjectId,
-          prompt: `Görsel: ${promptToGen}`,
-          code: `![Oluşturulan Görsel](${imgUrl})`,
-          type: "chat",
-          model,
-          user_id: user?.id || user?.email || "guest",
-          created_at: new Date().toISOString(),
-          published_url: null,
-          screenshot_url: null,
-        };
-        saveProjectLocally(imgSiteItem);
-        let savedSiteId: string | undefined = imgProjectId;
+        let savedSiteId: string | undefined = undefined;
+        if (user?.id) {
+          const { data: row } = await supabase.from("sites").insert({
+            prompt: `Görsel: ${promptToGen}`,
+            code: `![Oluşturulan Görsel](${imgUrl})`,
+            type: "chat",
+            model,
+            user_id: user.id
+          }).select().single();
+          if (row) {
+            savedSiteId = row.id;
+            loadHistory();
+          }
+        }
 
         setMessages(m => m.map(msg => {
           if (msg === newMsg) {
@@ -1051,21 +981,21 @@ export default function Index() {
         }, 3500);
       }
 
-      const newProjectId = `site_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const siteItem: SiteRow = {
-        id: newProjectId,
-        prompt: input || "(sohbet)",
-        code: parsed.code || finalChat || "(Boş)",
-        type: parsed.codeType || "chat",
-        model,
-        user_id: user?.id || user?.email || "guest",
-        created_at: new Date().toISOString(),
-        published_url: null,
-        screenshot_url: null,
-      };
-      saveProjectLocally(siteItem);
-      if (parsed.code) setSiteId(newProjectId);
-      let savedSiteId: string | undefined = newProjectId;
+      let savedSiteId: string | undefined = undefined;
+      if (user?.id) {
+        const { data: row } = await supabase.from("sites").insert({
+          prompt: input || "(sohbet)", 
+          code: parsed.code || finalChat || "(Boş)", 
+          type: parsed.codeType || "chat", 
+          model,
+          user_id: user.id
+        }).select().single();
+        if (row) { 
+          if (parsed.code) setSiteId(row.id); 
+          savedSiteId = row.id;
+          loadHistory(); 
+        }
+      }
 
       if (parsed.code && parsed.codeType) {
         if (parsed.codeType === "html") autoPublish(parsed.code, savedSiteId);
@@ -1130,16 +1060,8 @@ export default function Index() {
       if (screenshotUrl) {
         setScreenshot(screenshotUrl);
         log("success", "📸 Ekran görüntüsü hazır");
-      }
-      
-      const targetId = sId || siteId;
-      const key = getUserStorageKey();
-      const raw = localStorage.getItem(key);
-      if (raw && targetId) {
-        const list: SiteRow[] = JSON.parse(raw);
-        const updated = list.map(s => s.id === targetId ? { ...s, published_url: data.url, screenshot_url: screenshotUrl || s.screenshot_url } : s);
-        localStorage.setItem(key, JSON.stringify(updated));
-        setHistoryList(updated);
+        const id = sId || siteId;
+        if (id) await supabase.from("sites").update({ screenshot_url: screenshotUrl }).eq("id", id);
       }
       loadHistory();
     } catch (e: any) {
@@ -1264,36 +1186,8 @@ export default function Index() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            {user ? (
-              <div 
-                onClick={() => setMenuOpen(true)}
-                className="flex items-center gap-1.5 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-full pl-1.5 pr-3 py-1 shadow-sm cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800 transition select-none"
-              >
-                {user.avatar || user.user_metadata?.avatar_url || user.user_metadata?.picture ? (
-                  <img
-                    src={user.avatar || user.user_metadata?.avatar_url || user.user_metadata?.picture}
-                    alt="Profil"
-                    className="w-6 h-6 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[11px] font-bold">
-                    {(user.name || user.email || "U")[0].toUpperCase()}
-                  </div>
-                )}
-                <span className="text-xs font-semibold text-stone-800 dark:text-stone-200 max-w-[90px] truncate">
-                  {user.name || user.email?.split("@")[0] || "Kullanıcı"}
-                </span>
-              </div>
-            ) : (
-              <button
-                onClick={() => setMenuOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800 transition shadow-sm select-none"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Giriş</span>
-              </button>
-            )}
 
+            
             <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100" title="Admin Paneli" onClick={() => setAdminPanelOpen(true)}>
               <ShieldCheck className="w-5 h-5" />
             </Button>
@@ -1560,33 +1454,24 @@ export default function Index() {
             <div className="space-y-1">
               <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-2">Son Projeler</p>
               {historyList.length === 0 ? (
-                <p className="text-sm text-stone-400 py-6 text-center">Henüz proje yok</p>
+                <p className="text-sm text-stone-400 py-4 text-center">Henüz proje yok</p>
               ) : historyList.map(s => (
-                <div key={s.id} className="relative group flex items-center rounded-xl hover:bg-stone-200/60 transition">
-                  <button onClick={() => { loadFromHistory(s); setMenuOpen(false); }}
-                    className="w-full text-left px-3 py-2.5 pr-10">
-                    <div className="flex items-center gap-2.5">
-                      {s.screenshot_url ? (
-                        <img src={s.screenshot_url} className="w-10 h-7 rounded object-cover object-top border border-stone-200 shrink-0" alt="" />
-                      ) : (
-                        <div className="w-10 h-7 rounded bg-stone-200 shrink-0 flex items-center justify-center">
-                          <Globe2 className="w-3.5 h-3.5 text-stone-400" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-stone-900 truncate">{s.prompt}</p>
-                        <p className="text-[10px] text-stone-400">{new Date(s.created_at).toLocaleDateString("tr-TR")}</p>
+                <button key={s.id} onClick={() => { loadFromHistory(s); setMenuOpen(false); }}
+                  className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-stone-200/60 transition group">
+                  <div className="flex items-center gap-2">
+                    {s.screenshot_url ? (
+                      <img src={s.screenshot_url} className="w-10 h-7 rounded object-cover object-top border border-stone-200 shrink-0" alt="" />
+                    ) : (
+                      <div className="w-10 h-7 rounded bg-stone-200 shrink-0 flex items-center justify-center">
+                        <Globe2 className="w-3.5 h-3.5 text-stone-400" />
                       </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-stone-900 truncate">{s.prompt}</p>
+                      <p className="text-[10px] text-stone-400">{new Date(s.created_at).toLocaleDateString("tr-TR")}</p>
                     </div>
-                  </button>
-                  <button
-                    onClick={(e) => deleteProjectFromHistory(e, s.id)}
-                    className="absolute right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-rose-100 text-stone-400 hover:text-rose-600 transition"
-                    title="Projeyi Sil"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                  </div>
+                </button>
               ))}
             </div>
           </ScrollArea>
@@ -1600,21 +1485,21 @@ export default function Index() {
               <KeyRound className="w-4 h-4" /> API Anahtarları
             </button>
             {user ? (
-              <div className="space-y-1 pb-1 pt-1 border-t border-stone-200">
+              <div className="space-y-1 pb-1">
                 <div className="flex items-center gap-3 px-3 py-2">
-                  {user.avatar || user.user_metadata?.avatar_url || user.user_metadata?.picture ? (
-                    <img src={user.avatar || user.user_metadata?.avatar_url || user.user_metadata?.picture} alt="Profile" className="w-9 h-9 rounded-full border shadow-sm object-cover" />
+                  {user.user_metadata?.avatar_url ? (
+                    <img src={user.user_metadata.avatar_url} alt="Profile" className="w-9 h-9 rounded-full border shadow-sm" />
                   ) : (
-                    <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold uppercase shadow-sm">
-                      {(user.name || user.email || "U")[0]}
+                    <div className="w-9 h-9 rounded-full bg-stone-200 flex items-center justify-center text-stone-600 font-bold uppercase shadow-sm">
+                      {(user.email || "U")[0]}
                     </div>
                   )}
                   <div className="flex flex-col overflow-hidden">
-                    <span className="text-sm font-bold text-stone-800 truncate">{user.name || user.user_metadata?.full_name || user.email?.split('@')[0] || "Kullanıcı"}</span>
+                    <span className="text-sm font-bold text-stone-800 truncate">{user.user_metadata?.full_name || user.email?.split('@')[0] || "Kullanıcı"}</span>
                     <span className="text-xs text-stone-500 truncate">{user.email}</span>
                   </div>
                 </div>
-                <button onClick={logout}
+                <button onClick={() => supabase.auth.signOut()}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-rose-50 text-left text-sm text-rose-700 transition-colors">
                   <LogOut className="w-4 h-4" /> Çıkış Yap
                 </button>
@@ -1639,33 +1524,6 @@ export default function Index() {
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Açılış Bilgilendirme Kartı (Demo & Sistem Bilgisi) */}
-      <Dialog open={infoModalOpen} onOpenChange={setInfoModalOpen}>
-        <DialogContent className="rounded-3xl max-w-md p-6 border border-stone-200 dark:border-stone-800 bg-white/95 dark:bg-stone-900/95 backdrop-blur-xl shadow-2xl animate-fade-in select-none">
-          <DialogHeader className="space-y-3">
-            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-              <Sparkle className="w-5 h-5 animate-pulse" />
-              <DialogTitle className="text-base font-bold text-stone-900 dark:text-stone-100">
-                Mini AI Bilgilendirme
-              </DialogTitle>
-            </div>
-            <div className="space-y-3 text-xs leading-relaxed text-stone-700 dark:text-stone-300">
-              <p className="p-4 rounded-2xl bg-stone-100 dark:bg-stone-800/80 border border-stone-200/80 dark:border-stone-700/80 font-medium leading-relaxed">
-                Bu bir yapay zekadır. 24 mühendis tarafından oluşturulmuştur bu bir demo sürümdür yapay zeka hata yapabilir arayüz de hatalar olabilir gelişen bir sürümdür ve yerli ve milli yapay zeka mini ai altyapısı kullanıyordur voice mode yavaşdır lütfen saygı gösteriniz
-              </p>
-            </div>
-          </DialogHeader>
-          <div className="pt-2">
-            <Button
-              onClick={() => setInfoModalOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-white text-white dark:text-stone-900 font-semibold text-xs transition shadow-md"
-            >
-              Anladım, Devam Et
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={generatorOpen} onOpenChange={setGeneratorOpen}>
         <DialogContent className="rounded-2xl max-w-lg p-6 max-h-[85vh] flex flex-col" style={{ backgroundColor: "#faf7f5" }}>

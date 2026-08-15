@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useRef, useState, useEffect, useCallback } from "react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // ----------------------------------------------------------------------
@@ -898,11 +897,6 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (modelName === "Uzman Kodlayıcı") {
-                            toast.info("Bu model geliştiriliyor 🚀");
-                            setIsModelSelectOpen(false);
-                            return;
-                          }
                           setSelectedModel(modelName);
                           setIsModelSelectOpen(false);
                           onModelChange?.(modelName);
@@ -913,11 +907,6 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                           <ModelIcon model={modelName} className="size-3.5 opacity-85 group-hover:opacity-100 transition-opacity" />
                           {modelName}
                         </span>
-                        {modelName === "Uzman Kodlayıcı" && (
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                            Geliştiriliyor
-                          </span>
-                        )}
                       </button>
                     ))}
                   </div>
