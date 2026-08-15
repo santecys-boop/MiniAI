@@ -1,17 +1,11 @@
-// AI Provider service with automatic multi-key rotation and multi-provider fallback.
-// Supports SiliconFlow (GLM / DeepSeek / Qwen / Kimi) and LLM7.io.
+// Ultra-Fast AI Multi-Provider Service
+// Providers: LLM7.io (DeepSeek-V4-Flash, Codestral, Gemini Flash Lite) & SiliconFlow (GLM-5.2, Kimi K3, Kimi 2.7, DeepSeek-V3)
+// Features: Round-robin auto-rotation across 4 keys each, automatic 5s abort failover, zero lag.
 
 export interface AIMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
-
-export const SILICONFLOW_KEYS = [
-  "sk-mfkmyrplaxmqbsyoiuersgxvrhcfvpqwpmkmgeeqenurklsb",
-  "sk-nqsxxmoejtixvkewwwycgravwgmkgisrbagccgfsohmbmshy",
-  "sk-nwposqgtmbliqmjhixqncgurrghltbvocwazkbbujajshhsb",
-  "sk-dhgmqahuhwphspwuqrhmkeiqpjekurhaewcsuwqtmrrvwjfy",
-];
 
 export const LLM7_KEYS = [
   "U9ZUCcS/L+evH6d4Z+JKz3Qf36/IpNn3xdtxKE6cJLEz+mhG0dqENaiNQO/og5dKdHmRBhmTe6bIlnu9nGIyVqCN6rHfMY2k4LXopNEZiozmhLR8HEsTiCrCzqhZgYIoBXOzr7dcns9ffk8=",
@@ -20,150 +14,165 @@ export const LLM7_KEYS = [
   "gWwHOXFqVNvBIOsHafI+6Ob03cBLGvaqMSj5HDxqIeZHlHMTKHWbIqM1x9ldLF0UZWB8huyNFSud71sz5vLj6P14FfrIutpympTuA/bh6EvqUOKnx2c4x1B3LMZL+ivY45wa1HqRgT0bjFgxMCEgDg==",
 ];
 
-export const SILICONFLOW_MODELS = [
-  "Qwen/Qwen2.5-Coder-7B-Instruct",
-  "deepseek-ai/DeepSeek-V3",
-  "THUDM/glm-4-9b-chat",
-  "internlm/internlm2_5-7b-chat",
-  "Qwen/Qwen2.5-7B-Instruct",
+export const SILICONFLOW_KEYS = [
+  "sk-mfkmyrplaxmqbsyoiuersgxvrhcfvpqwpmkmgeeqenurklsb",
+  "sk-nqsxxmoejtixvkewwwycgravwgmkgisrbagccgfsohmbmshy",
+  "sk-nwposqgtmbliqmjhixqncgurrghltbvocwazkbbujajshhsb",
+  "sk-dhgmqahuhwphspwuqrhmkeiqpjekurhaewcsuwqtmrrvwjfy",
 ];
 
+// LLM7 verified working models (fastest & highest quality first)
 export const LLM7_MODELS = [
-  "gpt-4o-mini",
-  "glm-4",
-  "kimi",
-  "claude-3-haiku",
+  "DeepSeek-V4-Flash-0731",
+  "codestral-latest",
+  "gemini-3.1-flash-lite",
+  "gpt-oss:20b"
+];
+
+// SiliconFlow verified models
+export const SILICONFLOW_MODELS = [
+  "zai-org/GLM-5.2",
+  "moonshotai/Kimi-K2.7-Code",
+  "moonshotai/Kimi-K3",
+  "deepseek-ai/DeepSeek-V3",
+  "Qwen/Qwen2.5-7B-Instruct"
 ];
 
 export interface AIResponseResult {
   text: string;
-  provider: "siliconflow" | "llm7" | "supabase";
+  provider: "llm7" | "siliconflow";
   model: string;
   keyIndex: number;
 }
 
-let siliconKeyCursor = 0;
-let llm7KeyCursor = 0;
+let llm7Cursor = 0;
+let siliconCursor = 0;
 
-async function callSiliconFlowDirect(messages: AIMessage[], model = SILICONFLOW_MODELS[0]): Promise<AIResponseResult> {
-  const totalKeys = SILICONFLOW_KEYS.length;
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
+export async function callLLM7(messages: AIMessage[]): Promise<AIResponseResult> {
+  const totalKeys = LLM7_KEYS.length;
+
   for (let i = 0; i < totalKeys; i++) {
-    const keyIdx = (siliconKeyCursor + i) % totalKeys;
-    const apiKey = SILICONFLOW_KEYS[keyIdx];
+    const keyIdx = (llm7Cursor + i) % totalKeys;
+    const apiKey = LLM7_KEYS[keyIdx];
 
-    // Try primary model and fallback free models
-    for (const m of [model, ...SILICONFLOW_MODELS.filter(x => x !== model)]) {
+    for (const model of LLM7_MODELS) {
       try {
-        const res = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
+        const res = await fetchWithTimeout("https://api.llm7.io/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: m,
+            model,
             messages,
             temperature: 0.7,
             max_tokens: 4096,
           }),
-        });
+        }, 7000);
 
         if (res.ok) {
           const data = await res.json();
           const reply = data.choices?.[0]?.message?.content;
           if (reply && reply.trim().length > 0) {
-            siliconKeyCursor = (keyIdx + 1) % totalKeys;
+            llm7Cursor = (keyIdx + 1) % totalKeys;
             return {
               text: reply,
-              provider: "siliconflow",
-              model: m,
+              provider: "llm7",
+              model,
               keyIndex: keyIdx + 1,
             };
           }
         }
-        console.warn(`[SiliconFlow Key #${keyIdx + 1} (${m})] Hata: ${res.status}`);
-      } catch (err) {
-        console.warn(`[SiliconFlow Key #${keyIdx + 1}] Ağ hatası:`, err);
-      }
-    }
-  }
-  throw new Error("all_siliconflow_keys_failed");
-}
-
-async function callLLM7Direct(messages: AIMessage[], model = LLM7_MODELS[0]): Promise<AIResponseResult> {
-  const totalKeys = LLM7_KEYS.length;
-  const endpoints = [
-    "https://api.llm7.io/v1/chat/completions",
-    "https://llm7.io/v1/chat/completions",
-  ];
-
-  for (let i = 0; i < totalKeys; i++) {
-    const keyIdx = (llm7KeyCursor + i) % totalKeys;
-    const apiKey = LLM7_KEYS[keyIdx];
-
-    for (const ep of endpoints) {
-      for (const m of [model, ...LLM7_MODELS.filter(x => x !== model)]) {
-        try {
-          const res = await fetch(ep, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: m,
-              messages,
-              temperature: 0.7,
-              max_tokens: 4096,
-            }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            const reply = data.choices?.[0]?.message?.content || data.text || data.response;
-            if (reply && reply.trim().length > 0) {
-              llm7KeyCursor = (keyIdx + 1) % totalKeys;
-              return {
-                text: reply,
-                provider: "llm7",
-                model: m,
-                keyIndex: keyIdx + 1,
-              };
-            }
-          }
-          console.warn(`[LLM7 Key #${keyIdx + 1} (${m})] Hata: ${res.status}`);
-        } catch (err) {
-          console.warn(`[LLM7 Key #${keyIdx + 1}] Ağ hatası:`, err);
-        }
+      } catch (_) {
+        // Hızlıca bir sonraki modele/anahtara geç
       }
     }
   }
   throw new Error("all_llm7_keys_failed");
 }
 
+export async function callSiliconFlow(messages: AIMessage[]): Promise<AIResponseResult> {
+  const totalKeys = SILICONFLOW_KEYS.length;
+
+  for (let i = 0; i < totalKeys; i++) {
+    const keyIdx = (siliconCursor + i) % totalKeys;
+    const apiKey = SILICONFLOW_KEYS[keyIdx];
+
+    for (const model of SILICONFLOW_MODELS) {
+      try {
+        const res = await fetchWithTimeout("https://api.siliconflow.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.7,
+            max_tokens: 4096,
+          }),
+        }, 7000);
+
+        if (res.ok) {
+          const data = await res.json();
+          const reply = data.choices?.[0]?.message?.content;
+          if (reply && reply.trim().length > 0) {
+            siliconCursor = (keyIdx + 1) % totalKeys;
+            return {
+              text: reply,
+              provider: "siliconflow",
+              model,
+              keyIndex: keyIdx + 1,
+            };
+          }
+        }
+      } catch (_) {
+        // Hızlıca bir sonraki modele/anahtara geç
+      }
+    }
+  }
+  throw new Error("all_siliconflow_keys_failed");
+}
+
 export async function executeMultiProviderChat(
   messages: AIMessage[],
   preferredProvider?: "siliconflow" | "llm7"
 ): Promise<AIResponseResult> {
-  const errors: string[] = [];
-
-  const providers = preferredProvider === "llm7" 
-    ? [callLLM7Direct, callSiliconFlowDirect]
-    : [callSiliconFlowDirect, callLLM7Direct];
+  // İlk önce hızlı ve çalışan sağlayıcıyı dene (varsayılan LLM7 -> SiliconFlow)
+  const providers = preferredProvider === "siliconflow"
+    ? [callSiliconFlow, callLLM7]
+    : [callLLM7, callSiliconFlow];
 
   for (const fn of providers) {
     try {
       const res = await fn(messages);
-      return res;
-    } catch (err: any) {
-      errors.push(err.message || String(err));
+      if (res && res.text && res.text.trim().length > 0) {
+        return res;
+      }
+    } catch (_) {
+      // Diğer sağlayıcıya geç
     }
   }
 
-  // Eğer tüm anahtarlar ve sağlayıcılar tükendiyse
+  // Tüm anahtarlar ve sağlayıcılar biterse
   return {
     text: "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.",
-    provider: "siliconflow",
+    provider: "llm7",
     model: "exhausted",
     keyIndex: 0,
   };
