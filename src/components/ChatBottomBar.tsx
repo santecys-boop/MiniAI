@@ -33,12 +33,12 @@ export function ChatBottomBar({
 }: ChatBottomBarProps) {
 
   const modelMap: Record<string, string> = {
-    "Mini AI Hızlı": "sambanova",
-    "Uzman Kodlayıcı": "qwen-coder",
+    "Mini AI Hızlı": "fast",
+    "Mini AI Pro": "pro",
   };
 
   const handleModelSelect = (selectedName: string) => {
-    setModel(modelMap[selectedName] || "sambanova");
+    setModel(modelMap[selectedName] || "fast");
   };
 
   const handlePromptSubmit = (_value: string, meta: { model: string; effort: string; attachments: File[] }) => {

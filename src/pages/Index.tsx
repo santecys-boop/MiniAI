@@ -990,14 +990,12 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
 
           const providerResult = await executeMultiProviderChat(
             chatMsgs,
-            model === "llm7" ? "llm7" : "siliconflow"
+            model
           );
 
           if (providerResult.text) {
             aiTextResponse = providerResult.text;
-            if (providerResult.keyIndex > 0) {
-              log("ai", `⚡ Model yanıt verdi [${providerResult.provider.toUpperCase()}]: Key #${providerResult.keyIndex}`);
-            }
+            log("ai", "⚡ Mini AI yanıt üretti.");
           }
         } catch (directErr) {
           console.warn("Direct multi-provider error, trying fallback...", directErr);

@@ -14,6 +14,23 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [react(), mode === "development" && componentTagger(), zipSourcePlugin()].filter(Boolean),
+  build: {
+    sourcemap: false,
+    minify: "esbuild",
+    cssMinify: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+          ui: ["lucide-react", "@tanstack/react-query"],
+        },
+      },
+    },
+  },
+  esbuild: {
+    drop: mode === "production" ? ["console", "debugger"] : [],
+    legalComments: "none",
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
