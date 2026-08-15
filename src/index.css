@@ -71,6 +71,19 @@ All colors MUST be HSL.
     --tetris-5: oklch(0.577 0.215 27.3);
     --tetris-6: oklch(0.546 0.215 262.9);
     --tetris-7: oklch(0.646 0.194 41.1);
+
+    --bg-0: #FAF9F5;
+    --bg-000: #FAF9F5;
+    --bg-100: #FFFFFF;
+    --bg-200: #F0EEE6;
+    --bg-300: #DDDDDD;
+    --text-100: #1F1E1D;
+    --text-200: #3D3D3A;
+    --text-300: #73726C;
+    --text-400: #888888;
+    --text-500: #999999;
+    --accent-hover: #C6613F;
+    --ease-silk: cubic-bezier(0.2, 0.0, 0, 1.0);
   }
 
   .dark {
@@ -109,6 +122,18 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --bg-0: #212121;
+    --bg-000: #212121;
+    --bg-100: #262624;
+    --bg-200: #30302E;
+    --bg-300: #454540;
+    --text-100: #ECECEC;
+    --text-200: #E1E1E0;
+    --text-300: #B4B4B4;
+    --text-400: #8A8A88;
+    --text-500: #6B6B65;
+    --accent-hover: #E5AA7F;
 
     --tetris-1: oklch(0.797 0.134 211.5);
     --tetris-2: oklch(0.861 0.173 91.9);

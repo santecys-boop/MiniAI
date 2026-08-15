@@ -1064,37 +1064,6 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
       log("success", parsed.projectFiles ? `✅ Proje üretildi (${parsed.projectFiles.length} dosya, API Key: ${projApiKey.slice(0, 12)}...)` : parsed.code ? `✅ Kod üretildi (${parsed.code.length} karakter)` : `💬 Sohbet cevabı`);
       if (processedFiles) log("ai", `📁 Proje dosyaları: ${processedFiles.map(f => f.path).join(", ")}`);
 
-      if (wantsCompileOrBuild || parsed.code) {
-        log("ai", `⚡ AI Canlı Yayın: Evrensel Linux Sandbox API (${ONLINE_COMPILER_API_KEY.slice(0, 8)}...) üzerinden Build & Run akışı devrede...`);
-        
-        setTimeout(() => {
-          setMessages(m => m.map(msg => msg === newMsg ? { ...msg, compileStatus: "running" } : msg));
-          log("info", "$ AI motoru kod öbeğini ve varlıkları Build & Run için terminale yazıyor...");
-        }, 1200);
-
-        setTimeout(() => {
-          const isApk = /apk/i.test(lower);
-          const isZip = /zip/i.test(lower) || /build|paketle/i.test(lower);
-          const buildName = isApk ? "mini_app_linux_build_v1.0.apk" : isZip ? "project_bundle.zip" : undefined;
-          
-          const compileResult = isApk
-            ? `root@mini-ai-linux:~# ./gradlew assembleDebug --no-daemon\n[SUCCESS] Build 8.2 finished in 2.1s (0 errors)\n[OUTPUT] APK Bundle generated: mini_app_linux_build_v1.0.apk\n>> APK paketi hazır. Hemen indirebilirsiniz!`
-            : isZip
-            ? `root@mini-ai-linux:~# tar -czvf project_bundle.zip ./*\n[SUCCESS] Archived project bundle cleanly (Compression: 84%)\n>> ZIP paketi alt arayüzden indirilebilir.`
-            : `root@mini-ai-linux:~# build_and_run --auto-trigger\n[SYSTEM] Linux Virtual Sandbox Engine initialized via API Key (54a81b...)\n[EXEC] Process finished cleanly with return code 0.\n>> Canlı yayın arayüzü ve çalışan çıktı yukarıda aktif edildi!`;
-
-          setMessages(m => m.map(msg => msg === newMsg ? {
-            ...msg,
-            compileStatus: "success",
-            isCompiling: false,
-            compileOutput: compileResult,
-            buildArtifactName: buildName
-          } : msg));
-          log("success", `⚡ AI Canlı Yayın: Build & Run bitti! Yeni arayüz (iframe/terminal) açıldı.`);
-          toast.success("⚡ AI Otomatik Build & Run arayüzü açıldı!");
-        }, 3500);
-      }
-
       let savedSiteId: string | undefined = undefined;
       const newLocalProject: SiteRow = {
         id: safeUUID(),
@@ -1112,8 +1081,6 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
 
       if (parsed.code && parsed.codeType) {
         if (parsed.codeType === "html") autoPublish(parsed.code, savedSiteId);
-        setTab("preview");
-        toast.success("Önizleme hazır — sola kaydır veya Önizleme düğmesine bas");
       }
 
       setInput(""); setPendingAttachments([]);

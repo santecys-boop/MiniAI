@@ -256,7 +256,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
 
 
 
-        {/* Web Sitesi Canlı Önizleme Butonu (Arayüzde devasa iframe olmadan, sadece şık buton ile açılır) */}
+        {/* Web Sitesi Canlı Önizleme Butonu (Sadece butona basıldığında tam ekran açılır) */}
         {m.codeType === "html" && m.code && (
           <div className="mt-2.5">
             <button
@@ -278,45 +278,6 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
                 <ExternalLink className="w-3.5 h-3.5" />
               </div>
             </button>
-          </div>
-        )}
-
-        {/* Canlı Kod Akışı / Derleme Çıktısı (İsteğe bağlı gizlenebilir terminal) */}
-        {(m.compileStatus || (m.code && m.codeType !== "html")) && (
-          <div className="mt-2.5 rounded-2xl border border-stone-800 bg-stone-950 p-3 shadow-xl space-y-2 text-xs font-mono">
-            <button
-              type="button"
-              onClick={() => setShowCompile(p => !p)}
-              className="flex items-center justify-between w-full text-emerald-400 hover:text-emerald-300 transition text-xs font-bold"
-            >
-              <span className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-emerald-950/90 border border-emerald-500 text-emerald-300 font-extrabold text-xs">
-                  {">_"}
-                </span>
-                <span className="font-sans font-bold text-xs text-stone-200">Terminal & Derleme Çıktısı</span>
-              </span>
-              <span className="text-[11px] text-stone-400 font-sans">{showCompile ? "Gizle ▲" : "Göster ▼"}</span>
-            </button>
-
-            {showCompile && (
-              <div className="pt-2.5 border-t border-stone-800/80 space-y-2 text-[11px] text-stone-300 animate-fade-in">
-                {m.compileOutput && (
-                  <pre className="whitespace-pre-wrap overflow-auto max-h-48 text-stone-100 bg-stone-900/95 p-2.5 rounded-lg border border-stone-800 leading-snug">
-                    {m.compileOutput}
-                  </pre>
-                )}
-                {m.buildArtifactName && (
-                  <a
-                    href={m.buildArtifactUrl || "#"}
-                    download={m.buildArtifactName}
-                    onClick={e => { if (!m.buildArtifactUrl) { e.preventDefault(); toast.success(`${m.buildArtifactName} paketi cihazınıza indirildi!`); } }}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-sans font-bold text-xs shadow-md transition"
-                  >
-                    <Download className="w-4 h-4 text-white" /> {m.buildArtifactName} İndir
-                  </a>
-                )}
-              </div>
-            )}
           </div>
         )}
 

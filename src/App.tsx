@@ -15,6 +15,7 @@ import PublishedSite from "./pages/PublishedSite.tsx";
 import ApiDocs from "./pages/ApiDocs.tsx";
 import CodeApi from "./pages/CodeApi.tsx";
 import VoicePage from "./pages/VoicePage.tsx";
+import ClaudeInputDemo from "./pages/ClaudeInputDemo.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => {
           <Route path="/api-docs" element={<CodeApi />} />
           <Route path="/codeapi" element={<CodeApi />} />
           <Route path="/voice" element={<VoicePage />} />
+          <Route path="/claude-demo" element={<ClaudeInputDemo />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
