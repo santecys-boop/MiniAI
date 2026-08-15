@@ -1036,7 +1036,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
           domStructure: "Virtual UI Trees & Binary Layout Engine",
           bypassMode: "Cloud Sandbox Vision"
         },
-        ...(wantsCompileOrBuild || parsed.code ? { 
+        ...(wantsCompileOrBuild && parsed.code && parsed.codeType === "html" ? { 
           compileStatus: "starting", 
           isCompiling: true,
           linuxCommands: [/python/i.test(lower) ? "python3 main.py" : /npm|node/i.test(lower) ? "npm install && npm start" : /apk/i.test(lower) ? "./gradlew assembleRelease" : "bash compile_and_run.sh"] 
@@ -1072,8 +1072,8 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
          });
       }
       if (!isUnlimited()) spendDailyCredit();
-      log("success", parsed.projectFiles ? `✅ Proje üretildi (${parsed.projectFiles.length} dosya, API Key: ${projApiKey.slice(0, 12)}...)` : parsed.code ? `✅ Kod üretildi (${parsed.code.length} karakter)` : `💬 Sohbet cevabı`);
-      if (processedFiles) log("ai", `📁 Proje dosyaları: ${processedFiles.map(f => f.path).join(", ")}`);
+      log("success", parsed.projectFiles ? `✅ Dosya(lar) üretildi (${parsed.projectFiles.length} dosya)` : parsed.code ? `✅ Kod üretildi (${parsed.code.length} karakter)` : `💬 Sohbet cevabı`);
+      if (processedFiles) log("ai", `📁 Dosyalar: ${processedFiles.map(f => f.path).join(", ")}`);
 
       let savedSiteId: string | undefined = undefined;
       const newLocalProject: SiteRow = {
@@ -1087,11 +1087,11 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         screenshot_url: null,
       };
       saveProjectLocally(newLocalProject);
-      if (parsed.code) setSiteId(newLocalProject.id);
-      savedSiteId = newLocalProject.id;
 
-      if (parsed.code && parsed.codeType) {
-        if (parsed.codeType === "html") autoPublish(parsed.code, savedSiteId);
+      if (parsed.code && parsed.codeType === "html") {
+        setSiteId(newLocalProject.id);
+        savedSiteId = newLocalProject.id;
+        autoPublish(parsed.code, savedSiteId);
       }
 
       setInput(""); setPendingAttachments([]);
