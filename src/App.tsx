@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index.tsx";
@@ -18,24 +19,27 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
-    CapApp.addListener("appUrlOpen", async (event) => {
-      const url = event.url;
-      if (url.includes("#access_token=")) {
-        const hash = url.split("#")[1];
-        const params = new URLSearchParams(hash);
-        const access_token = params.get("access_token");
-        const refresh_token = params.get("refresh_token");
-        
-        if (access_token && refresh_token) {
-          await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
-          // Also set local storage directly as a fallback if needed
-          window.location.hash = ""; // Clean up the URL
-        }
+    try {
+      if (Capacitor.isNativePlatform()) {
+        CapApp.addListener("appUrlOpen", async (event) => {
+          const url = event.url;
+          if (url.includes("#access_token=")) {
+            const hash = url.split("#")[1];
+            const params = new URLSearchParams(hash);
+            const access_token = params.get("access_token");
+            const refresh_token = params.get("refresh_token");
+            
+            if (access_token && refresh_token) {
+              await supabase.auth.setSession({
+                access_token,
+                refresh_token,
+              });
+              window.location.hash = "";
+            }
+          }
+        }).catch(() => {});
       }
-    });
+    } catch {}
   }, []);
 
   return (
