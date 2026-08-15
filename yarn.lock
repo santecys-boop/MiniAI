@@ -300,6 +300,11 @@
   resolved "https://registry.yarnpkg.com/@capacitor/device/-/device-6.0.3.tgz#6ad16c97375cbca21a639377640bbaf255cebbff"
   integrity sha512-AmPtVuWeW31Ui+UMIl5zgCzwMU4fL4hIvYYvbAhXXyKWjxi1nk+CAh9B3k4OYUQLJI5nan0PoJ4GiiJ7x6DT/A==
 
+"@capacitor/filesystem@^6.0.0":
+  version "6.0.4"
+  resolved "https://registry.yarnpkg.com/@capacitor/filesystem/-/filesystem-6.0.4.tgz#b2a8339832e7286931ff82ee85a24efa7da808a3"
+  integrity sha512-eFlg/ZrwYA4Y6ClLRRikudVu2XvuZxfX/XC0ky9MgfbC9dyqTnVkkEoWM6vr1xR89YNY4mB0EeVTet1m1Jcumw==
+
 "@esbuild/aix-ppc64@0.21.5":
   version "0.21.5"
   resolved "https://registry.yarnpkg.com/@esbuild/aix-ppc64/-/aix-ppc64-0.21.5.tgz#c7184a326533fcdf1b8ee0733e21c713b975575f"
