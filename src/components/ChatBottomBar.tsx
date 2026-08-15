@@ -34,15 +34,14 @@ export function ChatBottomBar({
 
   const modelMap: Record<string, string> = {
     "Mini AI Hızlı": "fast",
-    "Mini AI Groq": "groq",
     "Mini AI Pro": "pro",
   };
 
   const handleModelSelect = (selectedName: string) => {
     const chosen = modelMap[selectedName] || "fast";
     setModel(chosen);
-    if (chosen === "groq") {
-      toast.warning("⚡ Mini AI Groq Modu: Bu mod aşırı hızlı metin/sohbet içindir; karmaşık siteler üretmek için tavsiye edilmez. Siteler için 'Mini AI Pro' kullanın.");
+    if (chosen === "pro") {
+      toast.success("🚀 Mini AI Pro (LLM7.io Yüksek Kapasiteli Kodlama Motoru) aktif edildi.");
     }
   };
 
@@ -106,7 +105,7 @@ export function ChatBottomBar({
         attachPopoverNode={attachPopover}
         busy={busy}
         placeholder="Mesaj yazın veya konuşmak için dokunun..."
-        models={["Mini AI Hızlı", "Mini AI Groq", "Mini AI Pro"]}
+        models={["Mini AI Hızlı", "Mini AI Pro"]}
         efforts={["Low", "Medium", "Max Effort"]}
       />
     </div>

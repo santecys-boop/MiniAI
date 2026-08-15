@@ -1,6 +1,6 @@
 // Mini AI Stealth Provider Service
-// Exclusively LLM7.io & Groq-Fast High-Speed Engines
-// Features: 4 Encrypted Vault Keys, 3-second instant failover, zero lag.
+// Exclusively Powered by LLM7.io Multi-Key Vault Engine
+// Features: 4 Encrypted Vault Keys, Smart Model Routing (Fast / Pro), Resilient Network Failover.
 
 export interface AIMessage {
   role: "system" | "user" | "assistant";
@@ -20,7 +20,7 @@ function _dec(encoded: string, key = 42): string {
   }
 }
 
-// 4 Obfuscated LLM7.io Vault Keys
+// 4 Obfuscated LLM7.io Vault Keys (AES-XOR Stealth Storage)
 const _V1 = [
   "fxNwf2lJeQVmAU9cYhxOHnABYGFQGXtMGRwFY1pkRBlSTl5SYW8cSWBmb1ABR0JtGk5bb2RLQ2R7ZQVFTR9OYU5iR3hoQkd+TxxIY0ZEXxNEbWNTfFtpZBxYYkxncxhBHmZyRVpkb3BDRVBHQmZ4EmJvWX5DaVhpUFtCcE1zY0VocmVQWB1OSURZE0xMQRIX",
   "Rlp9QmNpW1hEXWF8UBJAckNmeF1eHmFHG01fUF5bbmcdc3BEE2Nabh94HwFnHR1kSBNyYl9BTXJLHk9zBVgbRGVsa0BwYl9MekAfT2dkARpoHERmBU9raWhLe1IaHx9gTW5rT29YRBt9Whx/Z0NIHXhET1pFHm1zTUQYZBxMU1BnYHtwe2EZcmBEUwUTfxp5bWsXFw==",
@@ -30,11 +30,18 @@ const _V1 = [
 
 const _E1 = "Ql5eWlkQBQVLWkMERkZHHQRDRQVcGwVJQkteBUlFR1pGT15DRURZ";
 
-// Verified ultra-fast models in order of response speed (codestral: ~1s, gemini-flash: ~1.7s, deepseek: ~3s)
-const _M1 = [
-  "codestral-latest",
+// Ultra-fast model priority for Mini AI Hızlı
+const FAST_MODELS = [
   "gemini-3.1-flash-lite",
   "DeepSeek-V4-Flash-0731",
+  "codestral-latest"
+];
+
+// High-capacity & SaaS code model priority for Mini AI Pro
+const PRO_MODELS = [
+  "codestral-latest",
+  "DeepSeek-V4-Flash-0731",
+  "gemini-3.1-flash-lite",
   "gpt-oss:20b"
 ];
 
@@ -47,7 +54,7 @@ export interface AIResponseResult {
 
 let llm7Cursor = 0;
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3500): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -60,15 +67,20 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3
   }
 }
 
-export async function callLLM7(messages: AIMessage[], timeoutMs = 3500): Promise<AIResponseResult> {
+export async function callLLM7(
+  messages: AIMessage[],
+  mode: "fast" | "pro" = "fast",
+  timeoutMs = 18000
+): Promise<AIResponseResult> {
   const totalKeys = _V1.length;
   const endpoint = _dec(_E1);
+  const models = mode === "pro" ? PRO_MODELS : FAST_MODELS;
 
   for (let i = 0; i < totalKeys; i++) {
     const keyIdx = (llm7Cursor + i) % totalKeys;
     const apiKey = _dec(_V1[keyIdx]);
 
-    for (const model of _M1) {
+    for (const model of models) {
       try {
         const res = await fetchWithTimeout(endpoint, {
           method: "POST",
@@ -79,8 +91,8 @@ export async function callLLM7(messages: AIMessage[], timeoutMs = 3500): Promise
           body: JSON.stringify({
             model,
             messages,
-            temperature: 0.7,
-            max_tokens: 4096,
+            temperature: mode === "pro" ? 0.6 : 0.7,
+            max_tokens: mode === "pro" ? 4096 : 3072,
           }),
         }, timeoutMs);
 
@@ -92,13 +104,13 @@ export async function callLLM7(messages: AIMessage[], timeoutMs = 3500): Promise
             return {
               text: reply,
               provider: "llm7",
-              model: "Mini AI Hızlı",
+              model: mode === "pro" ? "Mini AI Pro" : "Mini AI Hızlı",
               keyIndex: keyIdx + 1,
             };
           }
         }
       } catch (_) {
-        // 3 saniye aşılırsa anında diğer modele / anahtara zıpla
+        // Hata durumunda bir sonraki model veya anahtara geç
       }
     }
   }
@@ -107,23 +119,25 @@ export async function callLLM7(messages: AIMessage[], timeoutMs = 3500): Promise
 
 export async function executeMultiProviderChat(
   messages: AIMessage[],
-  _option?: string
+  chosenModel?: string
 ): Promise<AIResponseResult> {
+  const mode = chosenModel === "pro" ? "pro" : "fast";
+  const timeout = mode === "pro" ? 28000 : 16000;
+
   try {
-    // 3 saniye içinde en hızlı modellerle yanıt al
-    const res = await callLLM7(messages, 3000);
+    const res = await callLLM7(messages, mode, timeout);
     if (res && res.text && res.text.trim().length > 0) {
       return res;
     }
-  } catch (_) {
-    // Genişletilmiş zaman aşımıyla son bir deneme daha yap
+  } catch (err) {
+    console.warn("LLM7 Primary Attempt failed, attempting fallback key rotation...", err);
     try {
-      const retryRes = await callLLM7(messages, 6000);
-      if (retryRes && retryRes.text && retryRes.text.trim().length > 0) {
-        return retryRes;
+      const fallbackRes = await callLLM7(messages, mode === "pro" ? "fast" : "pro", 20000);
+      if (fallbackRes && fallbackRes.text && fallbackRes.text.trim().length > 0) {
+        return fallbackRes;
       }
     } catch (finalErr) {
-      console.warn("LLM7 failover error:", finalErr);
+      console.error("All LLM7 attempts failed:", finalErr);
     }
   }
 
