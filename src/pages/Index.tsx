@@ -210,7 +210,10 @@ const FN_BASE = `${import.meta.env.VITE_AI_SUPABASE_URL || 'https://dhryhmkhdelw
 const ANON = import.meta.env.VITE_AI_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRocnlobWtoZGVsd3V6b3d5amJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1Mjg4MjgsImV4cCI6MjA5MjEwNDgyOH0.KM8m7NXq0GrIREO9yITXj3DaYN_JgLfkZuZIii-5kTw';
 
 export default function Index() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const [welcomeDisclaimerOpen, setWelcomeDisclaimerOpen] = useState(() => {
+    return !sessionStorage.getItem("mini_ai_disclaimer_seen");
+  });
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState("sambanova");
@@ -410,12 +413,31 @@ export default function Index() {
     toast.success(`Hoş geldin${onboard.name ? ", " + onboard.name : ""}! 🚀`);
   }
 
+  const getUserStorageKey = () => {
+    if (user?.id) return `mini_ai_sites_user_${user.id}`;
+    if (user?.email) return `mini_ai_sites_user_${user.email}`;
+    return `mini_ai_sites_guest`;
+  };
+
+  const saveProjectLocally = (project: SiteRow) => {
+    try {
+      const key = getUserStorageKey();
+      const existing: SiteRow[] = JSON.parse(localStorage.getItem(key) || "[]");
+      const filtered = existing.filter((p) => p.id !== project.id);
+      const updated = [project, ...filtered];
+      localStorage.setItem(key, JSON.stringify(updated));
+      setHistoryList(updated);
+    } catch (e) {
+      console.error("Local project save error:", e);
+    }
+  };
+
   async function loadHistory() {
     try {
-      const localData = localStorage.getItem("mini_ai_sites_history");
+      const key = getUserStorageKey();
+      const localData = localStorage.getItem(key);
       if (localData) {
-        const parsed = JSON.parse(localData);
-        setHistoryList(parsed);
+        setHistoryList(JSON.parse(localData));
       } else {
         setHistoryList([]);
       }
@@ -424,6 +446,24 @@ export default function Index() {
       setHistoryList([]);
     }
   }
+
+  const deleteProjectFromHistory = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      const key = getUserStorageKey();
+      const existing: SiteRow[] = JSON.parse(localStorage.getItem(key) || "[]");
+      const updated = existing.filter((p) => p.id !== id);
+      localStorage.setItem(key, JSON.stringify(updated));
+      setHistoryList(updated);
+      toast.success("Proje geçmişten silindi");
+      if (siteId === id) {
+        setSiteId(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      toast.error("Silinemedi");
+    }
+  };
 
   async function loadApiKeys() {
     if (!user) { setApiKeys([]); return; }
@@ -982,20 +1022,19 @@ export default function Index() {
       }
 
       let savedSiteId: string | undefined = undefined;
-      if (user?.id) {
-        const { data: row } = await supabase.from("sites").insert({
-          prompt: input || "(sohbet)", 
-          code: parsed.code || finalChat || "(Boş)", 
-          type: parsed.codeType || "chat", 
-          model,
-          user_id: user.id
-        }).select().single();
-        if (row) { 
-          if (parsed.code) setSiteId(row.id); 
-          savedSiteId = row.id;
-          loadHistory(); 
-        }
-      }
+      const newLocalProject: SiteRow = {
+        id: safeUUID(),
+        prompt: input || "(sohbet)",
+        code: parsed.code || finalChat || "(Boş)",
+        type: (parsed.codeType || "chat") as any,
+        model,
+        created_at: new Date().toISOString(),
+        published_url: null,
+        screenshot_url: null,
+      };
+      saveProjectLocally(newLocalProject);
+      if (parsed.code) setSiteId(newLocalProject.id);
+      savedSiteId = newLocalProject.id;
 
       if (parsed.code && parsed.codeType) {
         if (parsed.codeType === "html") autoPublish(parsed.code, savedSiteId);
@@ -1186,7 +1225,18 @@ export default function Index() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-
+            {user && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white shadow-sm border border-stone-200 text-xs font-medium text-stone-800">
+                {user.avatar || user.user_metadata?.avatar_url ? (
+                  <img src={user.avatar || user.user_metadata?.avatar_url} alt="Avatar" className="w-5 h-5 rounded-full object-cover" />
+                ) : (
+                  <div className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-700 flex items-center justify-center text-[10px] font-bold">
+                    {(user.name || user.email || "U")[0].toUpperCase()}
+                  </div>
+                )}
+                <span className="hidden sm:inline truncate max-w-[110px]">{user.name || user.email?.split("@")[0]}</span>
+              </div>
+            )}
             
             <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100" title="Admin Paneli" onClick={() => setAdminPanelOpen(true)}>
               <ShieldCheck className="w-5 h-5" />
@@ -1456,9 +1506,8 @@ export default function Index() {
               {historyList.length === 0 ? (
                 <p className="text-sm text-stone-400 py-4 text-center">Henüz proje yok</p>
               ) : historyList.map(s => (
-                <button key={s.id} onClick={() => { loadFromHistory(s); setMenuOpen(false); }}
-                  className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-stone-200/60 transition group">
-                  <div className="flex items-center gap-2">
+                <div key={s.id} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-stone-200/60 transition group">
+                  <button onClick={() => { loadFromHistory(s); setMenuOpen(false); }} className="flex-1 flex items-center gap-2 text-left min-w-0">
                     {s.screenshot_url ? (
                       <img src={s.screenshot_url} className="w-10 h-7 rounded object-cover object-top border border-stone-200 shrink-0" alt="" />
                     ) : (
@@ -1470,8 +1519,15 @@ export default function Index() {
                       <p className="text-sm text-stone-900 truncate">{s.prompt}</p>
                       <p className="text-[10px] text-stone-400">{new Date(s.created_at).toLocaleDateString("tr-TR")}</p>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    onClick={(e) => deleteProjectFromHistory(s.id, e)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-100 text-stone-400 hover:text-rose-600 transition"
+                    title="Projeyi Sil"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           </ScrollArea>
@@ -1485,21 +1541,21 @@ export default function Index() {
               <KeyRound className="w-4 h-4" /> API Anahtarları
             </button>
             {user ? (
-              <div className="space-y-1 pb-1">
+              <div className="space-y-1 pb-1 pt-1 border-t border-stone-200">
                 <div className="flex items-center gap-3 px-3 py-2">
-                  {user.user_metadata?.avatar_url ? (
-                    <img src={user.user_metadata.avatar_url} alt="Profile" className="w-9 h-9 rounded-full border shadow-sm" />
+                  {user.avatar || user.user_metadata?.avatar_url ? (
+                    <img src={user.avatar || user.user_metadata?.avatar_url} alt="Profile" className="w-9 h-9 rounded-full border shadow-sm object-cover" />
                   ) : (
                     <div className="w-9 h-9 rounded-full bg-stone-200 flex items-center justify-center text-stone-600 font-bold uppercase shadow-sm">
-                      {(user.email || "U")[0]}
+                      {(user.name || user.email || "U")[0]}
                     </div>
                   )}
                   <div className="flex flex-col overflow-hidden">
-                    <span className="text-sm font-bold text-stone-800 truncate">{user.user_metadata?.full_name || user.email?.split('@')[0] || "Kullanıcı"}</span>
-                    <span className="text-xs text-stone-500 truncate">{user.email}</span>
+                    <span className="text-sm font-bold text-stone-800 truncate">{user.name || user.user_metadata?.full_name || user.email?.split('@')[0] || "Kullanıcı"}</span>
+                    <span className="text-xs text-stone-500 truncate">{user.email || ""}</span>
                   </div>
                 </div>
-                <button onClick={() => supabase.auth.signOut()}
+                <button onClick={logout}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-rose-50 text-left text-sm text-rose-700 transition-colors">
                   <LogOut className="w-4 h-4" /> Çıkış Yap
                 </button>
@@ -1744,6 +1800,34 @@ export default function Index() {
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Açılış Bilgilendirme Kartı */}
+      <Dialog open={welcomeDisclaimerOpen} onOpenChange={setWelcomeDisclaimerOpen}>
+        <DialogContent className="max-w-md bg-stone-900/95 border border-stone-800 text-stone-100 backdrop-blur-xl shadow-2xl rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-stone-100">
+              <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+              Sistem ve Geliştirme Bildirimi
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-3 text-xs leading-relaxed text-stone-300">
+            <p>
+              Bu bir yapay zekadır. 24 mühendis tarafından oluşturulmuştur bu bir demo sürümdür yapay zeka hata yapabilir arayüz de hatalar olabilir gelişen bir sürümdür ve yerli ve milli yapay zeka mini ai altyapısı kullanıyordur voice mode yavaşdır lütfen saygı gösteriniz.
+            </p>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button
+              onClick={() => {
+                sessionStorage.setItem("mini_ai_disclaimer_seen", "1");
+                setWelcomeDisclaimerOpen(false);
+              }}
+              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs rounded-xl px-5 py-2"
+            >
+              Anladım, Devam Et
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -897,6 +897,11 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (modelName === "Uzman Kodlayıcı") {
+                            toast.info("Bu model geliştiriliyor 🚀");
+                            setIsModelSelectOpen(false);
+                            return;
+                          }
                           setSelectedModel(modelName);
                           setIsModelSelectOpen(false);
                           onModelChange?.(modelName);
@@ -906,6 +911,9 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                         <span className="flex items-center gap-2">
                           <ModelIcon model={modelName} className="size-3.5 opacity-85 group-hover:opacity-100 transition-opacity" />
                           {modelName}
+                          {modelName === "Uzman Kodlayıcı" && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 font-normal">Geliştiriliyor</span>
+                          )}
                         </span>
                       </button>
                     ))}

@@ -36,7 +36,7 @@ export function spendDailyCredit(): number {
 }
 
 export function getDailyRemaining(): number {
-  return Math.max(0, 20 - getDailyUsage().count);
+  return Math.max(0, 35 - getDailyUsage().count);
 }
 
 export function getUsedCoupons(): string[] {
