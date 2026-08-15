@@ -1246,8 +1246,8 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-slate-900" style={{ backgroundColor: "#faf7f5" }}>
-      <header className="relative z-20 sticky top-0">
+    <div className="relative h-screen h-[100dvh] max-h-[100dvh] w-full flex flex-col overflow-hidden text-slate-900" style={{ backgroundColor: "#faf7f5" }}>
+      <header className="shrink-0 relative z-20 h-14 border-b border-stone-200/60 bg-[#faf7f5]/90 backdrop-blur-md">
         <div className="flex items-center justify-between px-3 sm:px-5 h-14 gap-2">
           <div className="flex items-center gap-2">
             <button
@@ -1295,9 +1295,9 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         </div>
       </header>
 
-      {/* CHAT | PREVIEW grid */}
+      {/* CHAT | PREVIEW area */}
       <div
-        className={`relative z-10 grid h-[calc(100vh-3.5rem)] ${previewOpen ? "grid-cols-1 md:grid-cols-[minmax(320px,42%)_1fr]" : "grid-cols-1"}`}
+        className={`relative z-10 flex-1 min-h-0 w-full overflow-hidden ${previewOpen ? "grid grid-cols-1 md:grid-cols-[minmax(320px,42%)_1fr]" : "flex flex-col"}`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
