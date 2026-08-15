@@ -485,13 +485,17 @@ export default function Index() {
     }
   }
 
-  function makeApiKey() {
+  const [apiKeyMode, setApiKeyMode] = useState<"site" | "chat">("site");
+
+  function makeApiKey(mode: "site" | "chat" = apiKeyMode) {
     try {
-      const bytes = new Uint8Array(24);
+      const bytes = new Uint8Array(20);
       crypto.getRandomValues(bytes);
-      return `mini_${Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("")}`;
+      const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+      return mode === "chat" ? `mini_chat_${hex}` : `mini_site_${hex}`;
     } catch {
-      return `mini_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+      const rand = Math.random().toString(36).slice(2);
+      return mode === "chat" ? `mini_chat_${Date.now().toString(36)}_${rand}` : `mini_site_${Date.now().toString(36)}_${rand}`;
     }
   }
 
@@ -513,13 +517,14 @@ export default function Index() {
   async function createApiKey() {
     setApiKeyBusy(true);
     try {
-      const key = makeApiKey();
-      const prefix = key.slice(0, 12);
+      const key = makeApiKey(apiKeyMode);
+      const prefix = key.slice(0, 15);
       const masked = `${prefix}••••••••${key.slice(-4)}`;
+      const defaultLabel = apiKeyMode === "chat" ? "Mini AI Sohbet (Chat) API" : "Mini AI Web Sitesi & Kod API";
       const newRow: ApiKeyRow = {
         id: safeUUID(),
-        label: apiKeyLabel.trim() || "Mini AI API Anahtarı",
-        provider: "mini-ai",
+        label: apiKeyLabel.trim() || defaultLabel,
+        provider: apiKeyMode === "chat" ? "mini-chat" : "mini-site",
         key_prefix: prefix,
         masked_key: masked,
         active: true,
@@ -534,7 +539,7 @@ export default function Index() {
           await supabase.from("api_keys").insert({
             user_id: user.id,
             label: newRow.label,
-            provider: "mini-ai",
+            provider: newRow.provider,
             key_prefix: prefix,
             key_hash: await sha256Hex(key),
             masked_key: masked,
@@ -545,7 +550,7 @@ export default function Index() {
       setGeneratedApiKey(key);
       setApiKeyLabel("");
       await loadApiKeys();
-      toast.success("API anahtarı üretildi ✅");
+      toast.success(`${apiKeyMode === "chat" ? "Sohbet (Chat)" : "Web Sitesi"} API anahtarı üretildi ✅`);
     } catch (e: any) {
       toast.error(e.message || "API anahtarı üretilemedi");
     } finally { setApiKeyBusy(false); }
@@ -942,15 +947,16 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         enrichedSystemPrompt += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Kullanıcı bu mesajı özel 'Üret' (Görsel Üretim) butonuyla gönderdi. Bu bir görsel isteğidir! Kesinlikle kod yazma, kod kutusu açma veya [FILE:...] bloğu ekleme! KESİNLİKLE cevabının en başına [IMAGE_GEN] etiketini koyup İngilizce prompt yazmalısın. Örnek: [IMAGE_GEN]yazılacak prompt[/IMAGE_GEN]";
       }
 
-      const promptWithUser = userName && userName !== "Misafir"
-        ? `[Kullanıcı Adı: ${userName}] ${input}`
-        : input;
+      let promptToSend = promptWithUser;
+      if (file) {
+        promptToSend += `\n\n[KULLANICININ YÜKLEDİĞİ DOSYA: ${file.name}]\n${file.data}\n[/KULLANICININ YÜKLEDİĞİ DOSYA]\nTalimat: Bu dosyanın içeriğini dikkatle incele, kullanıcının isteğine göre cevapları yaz, analiz et veya düzenle ve sonucu eksiksiz olarak [FILE:${file.name}]...[/FILE] formatında üret.`;
+      }
 
       if (useAgent) {
         const r = await fetch(`${FN_BASE}/agent-mode`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({ prompt: promptWithUser, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
+          body: JSON.stringify({ prompt: promptToSend, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
         });
         const data = await r.json();
         if (data.error) throw new Error(data.error);
@@ -965,7 +971,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
           body: JSON.stringify({
-            prompt: promptWithUser, history: aiHistory, images: imgs,
+            prompt: promptToSend, history: aiHistory, images: imgs,
             attachedFile: file ? { name: file.name, content: file.data } : null,
             preferredProvider: model,
             systemPrompt: enrichedSystemPrompt,
@@ -1700,28 +1706,62 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
                 </p>
               </div>
             )}
+            {/* API Key Türü Seçimi */}
+            <div className="flex rounded-xl bg-stone-200/80 p-1 gap-1 text-xs font-sans">
+              <button
+                type="button"
+                onClick={() => setApiKeyMode("site")}
+                className={`flex-1 py-1.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition ${apiKeyMode === "site" ? "bg-stone-900 text-white shadow-xs" : "text-stone-700 hover:text-stone-900"}`}
+              >
+                <Globe className="w-3.5 h-3.5 text-amber-400" />
+                <span>🌐 Web Sitesi / Kod API</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setApiKeyMode("chat")}
+                className={`flex-1 py-1.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition ${apiKeyMode === "chat" ? "bg-stone-900 text-white shadow-xs" : "text-stone-700 hover:text-stone-900"}`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span>💬 Sohbet (Chat) & Dosya API</span>
+              </button>
+            </div>
+
             <div className="flex gap-2">
-              <Input value={apiKeyLabel} onChange={e => setApiKeyLabel(e.target.value)} placeholder="Anahtar etiketi (opsiyonel)" className="rounded-xl border-stone-200 flex-1 bg-white" />
+              <Input
+                value={apiKeyLabel}
+                onChange={e => setApiKeyLabel(e.target.value)}
+                placeholder={apiKeyMode === "chat" ? "Sohbet API etiketi (örn: Telegram Botu)" : "Web API etiketi (örn: Portfolyo Botu)"}
+                className="rounded-xl border-stone-200 flex-1 bg-white"
+              />
               <Button className="rounded-xl bg-stone-900 text-white hover:bg-stone-800 shrink-0 font-bold" onClick={createApiKey} disabled={apiKeyBusy}>
-                {apiKeyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yeni Anahtar Üret"}
+                {apiKeyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Anahtar Üret"}
               </Button>
             </div>
-            <ScrollArea className="max-h-48">
+
+            <ScrollArea className="max-h-40">
               <div className="space-y-2">
-                {apiKeys.map(k => (
-                  <div key={k.id} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-stone-900 truncate">{k.label}</p>
-                      <p className="text-xs text-stone-400 font-mono">{k.masked_key}</p>
+                {apiKeys.map(k => {
+                  const isChat = k.key_prefix?.includes("chat") || k.provider === "mini-chat";
+                  return (
+                    <div key={k.id} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-stone-900 truncate">{k.label}</p>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${isChat ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                            {isChat ? "💬 Chat" : "🌐 Site"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-stone-400 font-mono">{k.masked_key}</p>
+                      </div>
+                      <button onClick={() => toggleApiKey(k.id, k.active)} title={k.active ? "Aktif" : "Pasif"} className={`w-8 h-8 rounded-full flex items-center justify-center transition ${k.active ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-stone-100 text-stone-400 hover:bg-stone-200"}`}>
+                        <Zap className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => deleteApiKey(k.id)} title="Sil" className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 text-stone-400 hover:bg-rose-100 hover:text-rose-600 transition">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button onClick={() => toggleApiKey(k.id, k.active)} title={k.active ? "Aktif" : "Pasif"} className={`w-8 h-8 rounded-full flex items-center justify-center transition ${k.active ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-stone-100 text-stone-400 hover:bg-stone-200"}`}>
-                      <Zap className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={() => deleteApiKey(k.id)} title="Sil" className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 text-stone-400 hover:bg-rose-100 hover:text-rose-600 transition">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
                 {apiKeys.length === 0 && <p className="text-sm text-stone-400 text-center py-2">Henüz anahtar yok</p>}
               </div>
             </ScrollArea>
@@ -1730,7 +1770,8 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
             <div className="border-t border-stone-200 pt-3 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-                  <Code2 className="w-4 h-4 text-emerald-600" /> Koda Nasıl Eklenir?
+                  <Code2 className="w-4 h-4 text-emerald-600" />
+                  <span>{apiKeyMode === "chat" ? "Sohbet API'si Koda Nasıl Eklenir?" : "Site API'si Koda Nasıl Eklenir?"}</span>
                 </p>
                 <div className="flex items-center gap-1 bg-stone-200/80 p-0.5 rounded-lg text-[11px] font-sans">
                   <button
@@ -1758,26 +1799,38 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
               </div>
 
               {(() => {
-                const currentKey = generatedApiKey || (apiKeys[0]?.key_prefix ? apiKeys[0].key_prefix + '...' : 'mini_xxxxxxxxxxxxxxxx');
+                const currentKey = generatedApiKey || (apiKeys.find(k => apiKeyMode === "chat" ? (k.key_prefix?.includes("chat") || k.provider === "mini-chat") : (!k.key_prefix?.includes("chat") && k.provider !== "mini-chat"))?.key_prefix ? (apiKeys[0]?.key_prefix + '...') : (apiKeyMode === "chat" ? 'mini_chat_xxxxxxxxxxxxxxxx' : 'mini_site_xxxxxxxxxxxxxxxx'));
                 const apiEndpoint = "https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/generate-site";
                 
-                const pythonCode = `import requests\n\nAPI_KEY = "${currentKey}"\nurl = "${apiEndpoint}"\n\nheaders = {\n    "Authorization": f"Bearer {API_KEY}",\n    "Content-Type": "application/json"\n}\n\ndata = {\n    "prompt": "Modern portfolyo web sitesi",\n    "type": "html"\n}\n\nresponse = requests.post(url, headers=headers, json=data)\nprint(response.json())`;
+                let pythonCode = "";
+                let jsCode = "";
+                let curlCode = "";
 
-                const jsCode = `// JavaScript / Node.js\nconst API_KEY = "${currentKey}";\n\nconst res = await fetch("${apiEndpoint}", {\n  method: "POST",\n  headers: {\n    "Authorization": \`Bearer \${API_KEY}\`,\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({\n    prompt: "Modern portfolyo web sitesi",\n    type: "html"\n  })\n});\n\nconst data = await res.json();\nconsole.log(data);`;
+                if (apiKeyMode === "chat") {
+                  pythonCode = `import requests\n\nAPI_KEY = "${currentKey}"\nurl = "${apiEndpoint}"\n\nheaders = {\n    "Authorization": f"Bearer {API_KEY}",\n    "Content-Type": "application/json"\n}\n\ndata = {\n    "prompt": "Python ile veri analizi ve dosya işlemleri nasıl yapılır? Örnek kod ver.",\n    "type": "chat"\n}\n\nresponse = requests.post(url, headers=headers, json=data)\nresult = response.json()\nprint("Mini AI Yanıtı:\\n", result.get("text") or result.get("message"))`;
 
-                const curlCode = `curl -X POST ${apiEndpoint} \\\n  -H "Authorization: Bearer ${currentKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "Modern portfolyo", "type": "html"}'`;
+                  jsCode = `// JavaScript / Node.js (Sohbet & Dosya API)\nconst API_KEY = "${currentKey}";\n\nconst res = await fetch("${apiEndpoint}", {\n  method: "POST",\n  headers: {\n    "Authorization": \`Bearer \${API_KEY}\`,\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({\n    prompt: "Merhaba! Bana yapay zekanın geleceğini 3 maddede özetler misin?",\n    type: "chat"\n  })\n});\n\nconst data = await res.json();\nconsole.log("Mini AI Yanıtı:", data.text || data.message);`;
+
+                  curlCode = `curl -X POST ${apiEndpoint} \\\n  -H "Authorization: Bearer ${currentKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "Merhaba! Neler yapabilirsin?", "type": "chat"}'`;
+                } else {
+                  pythonCode = `import requests\n\nAPI_KEY = "${currentKey}"\nurl = "${apiEndpoint}"\n\nheaders = {\n    "Authorization": f"Bearer {API_KEY}",\n    "Content-Type": "application/json"\n}\n\ndata = {\n    "prompt": "Modern koyu temalı portfolyo web sitesi",\n    "type": "html"\n}\n\nresponse = requests.post(url, headers=headers, json=data)\nresult = response.json()\nprint("Yayınlanan Site URL:", result.get("url"))\nprint("HTML Kodu:", result.get("code")[:100], "...")`;
+
+                  jsCode = `// JavaScript / Node.js (Web Sitesi & Kod API)\nconst API_KEY = "${currentKey}";\n\nconst res = await fetch("${apiEndpoint}", {\n  method: "POST",\n  headers: {\n    "Authorization": \`Bearer \${API_KEY}\`,\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({\n    prompt: "Modern portfolyo web sitesi",\n    type: "html"\n  })\n});\n\nconst data = await res.json();\nconsole.log("Site URL:", data.url);\nconsole.log("HTML:", data.code);`;
+
+                  curlCode = `curl -X POST ${apiEndpoint} \\\n  -H "Authorization: Bearer ${currentKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "Modern portfolyo web sitesi", "type": "html"}'`;
+                }
 
                 const activeCode = apiCodeLang === "python" ? pythonCode : apiCodeLang === "js" ? jsCode : curlCode;
 
                 return (
-                  <div className="relative rounded-xl border border-stone-800 bg-stone-950 p-3 text-[11px] font-mono text-stone-200 overflow-auto max-h-40 shadow-inner">
+                  <div className="relative rounded-xl border border-stone-800 bg-stone-950 p-3 text-[11px] font-mono text-stone-200 overflow-auto max-h-44 shadow-inner">
                     <button
                       type="button"
                       onClick={() => {
                         navigator.clipboard.writeText(activeCode);
                         toast.success(`${apiCodeLang.toUpperCase()} entegrasyon kodu panoya kopyalandı!`);
                       }}
-                      className="absolute top-2 right-2 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[10px] text-stone-300 font-sans font-medium"
+                      className="absolute top-2 right-2 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[10px] text-stone-300 font-sans font-medium z-10"
                     >
                       Kodu Kopyala
                     </button>

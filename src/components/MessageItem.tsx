@@ -208,11 +208,13 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
         )}
 
         {m.projectFiles && m.projectFiles.length > 0 && (
-          <div className="mt-2 rounded-2xl border border-stone-700 bg-stone-950 overflow-hidden shadow-xl animate-fade-in">
-            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-stone-800 bg-stone-900/80">
+          <div className="mt-2.5 rounded-2xl border border-stone-700/80 bg-stone-950 overflow-hidden shadow-xl animate-fade-in">
+            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-stone-800 bg-stone-900/90">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-bold text-white tracking-wide">PROJE DOSYALARI</span>
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-white tracking-wide">
+                  {m.projectFiles.length === 1 && m.projectFiles[0].path.endsWith(".txt") ? "OLUŞTURULAN METİN DOSYASI" : "OLUŞTURULAN DOSYALAR"}
+                </span>
                 <span className="px-1.5 py-0.5 rounded-md bg-stone-800 text-stone-300 text-[10px] font-mono">{m.projectFiles.length} dosya</span>
               </div>
               {m.projectApiKey && (
@@ -222,30 +224,79 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
                 </div>
               )}
             </div>
-            <div className="max-h-72 overflow-auto">
+            <div className="divide-y divide-stone-800/60 max-h-96 overflow-auto">
               {m.projectFiles.map((f, fi) => {
-                const icon = f.path.endsWith('.env') ? '🔐' : f.path.endsWith('.html') ? '🌐' : f.path.endsWith('.css') ? '🎨' : f.path.endsWith('.tsx') || f.path.endsWith('.jsx') ? '⚛️' : f.path.endsWith('.js') || f.path.endsWith('.ts') ? '📜' : f.path.endsWith('.json') ? '📋' : f.path.endsWith('.md') ? '📄' : f.path.endsWith('.py') ? '🐍' : '📁';
+                const icon = f.path.endsWith('.env') ? '🔐' : f.path.endsWith('.html') ? '🌐' : f.path.endsWith('.css') ? '🎨' : f.path.endsWith('.tsx') || f.path.endsWith('.jsx') ? '⚛️' : f.path.endsWith('.js') || f.path.endsWith('.ts') ? '📜' : f.path.endsWith('.json') ? '📋' : f.path.endsWith('.md') ? '📄' : f.path.endsWith('.py') ? '🐍' : f.path.endsWith('.txt') ? '📝' : '📁';
                 const isEnv = f.path.endsWith('.env');
+                const fileContent = isEnv ? f.content.replace(/{{AUTO_API_KEY}}/g, m.projectApiKey || 'KEY_LOADING...') : f.content;
+                const lineCount = fileContent.split('\n').length;
                 return (
-                  <details key={fi} className="group border-b border-stone-800/60 last:border-0">
-                    <summary className="flex items-center gap-2.5 px-3.5 py-2 cursor-pointer hover:bg-stone-800/50 transition text-xs select-none">
-                      <span className="text-sm">{icon}</span>
-                      <span className="font-mono text-stone-200 flex-1">{f.path}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                        f.lang === 'html' ? 'bg-orange-950 text-orange-300 border border-orange-800/50' :
-                        f.lang === 'css' ? 'bg-blue-950 text-blue-300 border border-blue-800/50' :
-                        f.lang === 'javascript' || f.lang === 'jsx' ? 'bg-yellow-950 text-yellow-300 border border-yellow-800/50' :
-                        f.lang === 'tsx' || f.lang === 'typescript' ? 'bg-sky-950 text-sky-300 border border-sky-800/50' :
-                        f.lang === 'bash' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/50' :
+                  <details key={fi} className="group" open={m.projectFiles && m.projectFiles.length === 1}>
+                    <summary className="flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer hover:bg-stone-900/60 transition text-xs select-none">
+                      <span className="text-base">{icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono font-semibold text-stone-200 truncate">{f.path}</div>
+                        <div className="text-[10px] text-stone-400 font-sans">{lineCount} satır • {(fileContent.length / 1024).toFixed(1)} KB</div>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        f.lang === 'html' ? 'bg-orange-950/80 text-orange-300 border border-orange-800/50' :
+                        f.lang === 'css' ? 'bg-blue-950/80 text-blue-300 border border-blue-800/50' :
+                        f.lang === 'javascript' || f.lang === 'jsx' ? 'bg-yellow-950/80 text-yellow-300 border border-yellow-800/50' :
+                        f.lang === 'tsx' || f.lang === 'typescript' ? 'bg-sky-950/80 text-sky-300 border border-sky-800/50' :
+                        f.lang === 'python' ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/50' :
+                        f.lang === 'json' ? 'bg-amber-950/80 text-amber-300 border border-amber-800/50' :
                         'bg-stone-800 text-stone-300 border border-stone-700'
-                      }`}>{f.lang}</span>
-                      <span className="text-[10px] text-stone-500">{(f.content.length / 1024).toFixed(1)}KB</span>
+                      }`}>{f.path.split('.').pop() || f.lang}</span>
+                      
+                      {/* Direct Download Button */}
+                      <button
+                        type="button"
+                        title="Dosyayı İndir"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const mimeType = f.path.endsWith('.txt') ? 'text/plain;charset=utf-8' :
+                            f.path.endsWith('.json') ? 'application/json;charset=utf-8' :
+                            f.path.endsWith('.py') ? 'text/x-python;charset=utf-8' :
+                            f.path.endsWith('.csv') ? 'text/csv;charset=utf-8' :
+                            f.path.endsWith('.md') ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8';
+                          const blob = new Blob([fileContent], { type: mimeType });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = f.path;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                          toast.success(`${f.path} başarıyla indirildi`);
+                        }}
+                        className="p-1.5 rounded-lg bg-stone-800 hover:bg-emerald-900/60 text-stone-300 hover:text-emerald-300 border border-stone-700 hover:border-emerald-500/40 transition-colors shadow-xs"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Direct Copy Button */}
+                      <button
+                        type="button"
+                        title="İçeriği Kopyala"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(fileContent);
+                          toast.success(`${f.path} içeriği panoya kopyalandı`);
+                        }}
+                        className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white border border-stone-700 transition-colors shadow-xs"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
+
                       <ChevronRight className="w-3.5 h-3.5 text-stone-500 transition-transform group-open:rotate-90" />
                     </summary>
-                    <div className="bg-black/90 border-t border-stone-800">
-                      <pre className={`p-3 text-[11px] font-mono leading-snug overflow-auto max-h-48 ${
+                    <div className="bg-black/90 border-t border-stone-800 p-3">
+                      <pre className={`text-[11px] font-mono leading-relaxed overflow-auto max-h-64 rounded-lg p-2 bg-stone-950/80 border border-stone-800/80 ${
                         isEnv ? 'text-emerald-400' : 'text-amber-200/90'
-                      }`}><code>{isEnv ? f.content.replace(/{{AUTO_API_KEY}}/g, m.projectApiKey || 'KEY_LOADING...') : f.content}</code></pre>
+                      }`}><code>{fileContent}</code></pre>
                     </div>
                   </details>
                 );

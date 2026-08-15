@@ -105,17 +105,25 @@ export function parseMultiFileResponse(raw: string): { chat?: string; plan?: str
   
   const chatMatch = raw.match(/\[CHAT\]\s*([\s\S]*?)(?=\[FILE:|\[PLAN\]|\[CODE:|$)/i);
   if (chatMatch) chat = chatMatch[1].trim();
+  else {
+    // If no explicit [CHAT] tag, take the text before the first [FILE:
+    const preFileMatch = raw.match(/^([\s\S]*?)(?=\[FILE:|\[PLAN\]|\[CODE:)/i);
+    if (preFileMatch && preFileMatch[1].trim()) chat = preFileMatch[1].trim();
+  }
   
   const planMatch = raw.match(/\[PLAN\]\s*([\s\S]*?)(?=\[FILE:|\[CODE:|$)/i);
   if (planMatch) plan = planMatch[1].trim();
 
-  const fileRegex = /\[FILE:([^\]]+)\]\s*([\s\S]*?)(?=\[FILE:|$)/gi;
+  const fileRegex = /\[FILE:([^\]]+)\]\s*([\s\S]*?)(?=\[\/FILE\]|\[FILE:|$)/gi;
   let match;
   while ((match = fileRegex.exec(raw)) !== null) {
     let content = match[2].trim();
-    content = content.replace(/^```[\w]*\s*\n?/i, "").replace(/\n?```\s*$/i, "");
+    content = content.replace(/\[\/FILE\]/gi, "").trim();
+    content = content.replace(/^```[\w]*\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     const path = match[1].trim();
-    files.push({ path, content, lang: getLangFromPath(path) });
+    if (path && content) {
+      files.push({ path, content, lang: getLangFromPath(path) });
+    }
   }
 
   const htmlFile = files.find(f => f.path.endsWith(".html")) || files.find(f => f.content.includes("<!DOCTYPE") || f.content.includes("<html"));
@@ -129,11 +137,12 @@ export function parseAIResponse(raw: string): { chat?: string; plan?: string; co
   if (text.includes("[FILE:")) {
     const multi = parseMultiFileResponse(text);
     if (multi.files.length > 0) {
+      const hasHtml = !!multi.mainHtml;
       return {
         chat: multi.chat,
         plan: multi.plan,
-        code: multi.mainHtml || multi.files[0].content,
-        codeType: multi.mainHtml ? "html" : (multi.files[0].lang === "tsx" ? "react" : "html"),
+        code: multi.mainHtml || (hasHtml ? multi.files[0].content : undefined),
+        codeType: hasHtml ? (multi.mainHtml ? "html" : (multi.files[0].lang === "tsx" ? "react" : "html")) : undefined,
         projectFiles: multi.files,
       };
     }
