@@ -135,22 +135,94 @@ export function parseMultiFileResponse(raw: string): { chat?: string; plan?: str
   return { chat: chat || undefined, plan: plan || undefined, files, mainHtml: htmlFile?.content };
 }
 
-export function parseAIResponse(raw: string, attachedFileName?: string): { chat?: string; plan?: string; code?: string; codeType?: "html" | "react"; projectFiles?: ProjectFile[] } {
+export interface FullStackProjectResult {
+  chat?: string;
+  plan?: string;
+  code?: string;
+  codeType?: "html" | "react";
+  projectFiles?: ProjectFile[];
+  projectName?: string;
+  architecturePlan?: string;
+  databaseQueries?: string[];
+}
+
+export function parseAIResponse(raw: string, attachedFileName?: string): FullStackProjectResult {
   let text = raw.trim();
-  
+
+  // 1. JSON Şablon Ayrıştırması (Full-Stack SaaS JSON formatı)
+  try {
+    let jsonStr = text;
+    // Eğer markdown codeblock içine alınmışsa temizle
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (jsonMatch) jsonStr = jsonMatch[1].trim();
+    else {
+      const braceMatch = text.match(/\{[\s\S]*"files"[\s\S]*\}/i);
+      if (braceMatch) jsonStr = braceMatch[0].trim();
+    }
+
+    if (jsonStr.startsWith("{") && jsonStr.endsWith("}")) {
+      const parsed = JSON.parse(jsonStr);
+      if (parsed && (Array.isArray(parsed.files) || parsed.project_name || parsed.architecture_plan)) {
+        const files: ProjectFile[] = [];
+        if (Array.isArray(parsed.files)) {
+          for (const f of parsed.files) {
+            if (f.path && f.content) {
+              files.push({
+                path: f.path.trim(),
+                content: f.content.trim(),
+                lang: getLangFromPath(f.path.trim())
+              });
+            }
+          }
+        }
+
+        const sqlQueries: string[] = Array.isArray(parsed.database?.sql_queries) 
+          ? parsed.database.sql_queries.map((q: any) => String(q).trim()) 
+          : [];
+
+        if (sqlQueries.length > 0 && !files.some(f => f.path.includes("schema.sql"))) {
+          files.push({
+            path: "supabase/schema.sql",
+            content: `-- Supabase PostgreSQL Şeması\n-- Oluşturulma: ${new Date().toLocaleDateString("tr-TR")}\n\n` + sqlQueries.join("\n\n"),
+            lang: "sql"
+          });
+        }
+
+        // Ana HTML dosyasını bul veya React dosyasından virtual preview üret
+        const htmlFile = files.find(f => f.path.endsWith(".html") || f.content.includes("<!DOCTYPE"));
+        const mainReact = files.find(f => f.path.includes("App.jsx") || f.path.includes("App.tsx") || f.path.includes("Dashboard"));
+
+        return {
+          chat: parsed.architecture_plan ? `🚀 **${parsed.project_name || "Full-Stack SaaS"}** projesi ${files.length} dosya ve veritabanı şemasıyla başarıyla oluşturuldu.` : undefined,
+          plan: parsed.architecture_plan,
+          projectName: parsed.project_name || "saas-app",
+          architecturePlan: parsed.architecture_plan,
+          databaseQueries: sqlQueries,
+          projectFiles: files,
+          code: htmlFile?.content || (mainReact ? mainReact.content : (files[0]?.content || undefined)),
+          codeType: htmlFile ? "html" : "react"
+        };
+      }
+    }
+  } catch (_) {
+    // JSON parse başarısız olursa diğer yöntemlere geç
+  }
+
+  // 2. Çoklu Dosya [FILE:...] Etiketleri Ayrıştırması
   const multi = parseMultiFileResponse(text);
   if (multi.files.length > 0) {
     const hasHtml = !!multi.mainHtml;
+    const mainReact = multi.files.find(f => f.path.includes("App.") || f.path.includes("index.") || f.path.endsWith(".jsx") || f.path.endsWith(".tsx"));
     return {
       chat: multi.chat,
       plan: multi.plan,
-      code: multi.mainHtml || (hasHtml ? multi.files[0].content : undefined),
-      codeType: hasHtml ? (multi.mainHtml ? "html" : (multi.files[0].lang === "tsx" ? "react" : "html")) : undefined,
+      code: multi.mainHtml || (mainReact ? mainReact.content : multi.files[0].content),
+      codeType: hasHtml ? (multi.mainHtml ? "html" : "react") : (mainReact ? "react" : "html"),
       projectFiles: multi.files,
     };
   }
 
-  // Fallback: If user attached a file or asked for a file, and model returned a fenced code block without HTML:
+  // 3. Tekil Kod Bloğu Fallback (Örn: .py, .txt, .sql vb.)
   const codeBlockMatch = text.match(/```([\w]*)\s*\n([\s\S]*?)```/);
   if (codeBlockMatch && !text.includes("<!DOCTYPE") && !text.includes("<html")) {
     const blockLang = codeBlockMatch[1].trim().toLowerCase();
@@ -181,4 +253,149 @@ export function parseAIResponse(raw: string, attachedFileName?: string): { chat?
     return { code: m ? m[0] : text, codeType: "html" };
   }
   return { chat: text };
+}
+
+import JSZip from "jszip";
+import { buildVirtualSandboxBundle } from "./lib/virtualModuleResolver";
+
+export function generateVirtualPreviewHtml(files: ProjectFile[], projectName = "Mini SaaS", databaseQueries: string[] = []): string {
+  const htmlFile = files.find(f => f.path.toLowerCase().endsWith(".html") || f.content.includes("<!DOCTYPE"));
+  if (htmlFile) {
+    return injectAIBridge(htmlFile.content);
+  }
+
+  return buildVirtualSandboxBundle({
+    files,
+    projectName,
+    databaseQueries
+  });
+}
+
+export async function exportProjectToZip(files: ProjectFile[], projectName = "mini-saas-project", sqlQueries: string[] = []): Promise<Blob> {
+  const zip = new JSZip();
+
+  const packageJson = {
+    name: projectName.toLowerCase().replace(/[^a-z0-9_-]/g, "-"),
+    private: true,
+    version: "0.1.0",
+    type: "module",
+    scripts: {
+      dev: "vite",
+      build: "vite build",
+      preview: "vite preview"
+    },
+    dependencies: {
+      react: "^18.3.1",
+      "react-dom": "^18.3.1",
+      "react-router-dom": "^6.26.0",
+      "lucide-react": "^0.441.0",
+      clsx: "^2.1.1",
+      "tailwind-merge": "^2.5.2"
+    },
+    devDependencies: {
+      "@vitejs/plugin-react": "^4.3.1",
+      vite: "^5.4.2",
+      tailwindcss: "^3.4.10",
+      postcss: "^8.4.45",
+      autoprefixer: "^10.4.20"
+    }
+  };
+  zip.file("package.json", JSON.stringify(packageJson, null, 2));
+
+  zip.file("vite.config.js", `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+});
+`);
+
+  zip.file("tailwind.config.js", `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+`);
+
+  zip.file("postcss.config.js", `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+`);
+
+  zip.file("index.html", `<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${projectName}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+`);
+
+  if (!files.some(f => f.path.includes("main.jsx") || f.path.includes("main.tsx"))) {
+    zip.file("src/main.jsx", `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import './index.css';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+`);
+  }
+
+  if (!files.some(f => f.path.includes("index.css"))) {
+    zip.file("src/index.css", `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+`);
+  }
+
+  for (const f of files) {
+    zip.file(f.path, f.content);
+  }
+
+  if (sqlQueries.length > 0 && !files.some(f => f.path.includes("schema.sql"))) {
+    zip.file("supabase/schema.sql", `-- Supabase PostgreSQL Şeması\n-- Oluşturulma: ${new Date().toLocaleString("tr-TR")}\n\n` + sqlQueries.join("\n\n"));
+  }
+
+  zip.file("README.md", `# ${projectName}
+
+Bu proje **Mini AI (Lovable Seviyesi Full-Stack SaaS Motoru)** tarafından otomatik olarak oluşturulmuştur.
+
+## 🚀 Projeyi Çalıştırma:
+
+\`\`\`bash
+# 1. Bağımlılıkları yükleyin
+npm install
+
+# 2. Geliştirme sunucusunu başlatın
+npm run dev
+\`\`\`
+
+## 🗄️ Veritabanı Kurulumu:
+\`supabase/schema.sql\` dosyasındaki SQL kodlarını Supabase Dashboard -> SQL Editor alanına yapıştırıp çalıştırarak veritabanı tablolarınızı anında oluşturabilirsiniz.
+`);
+
+  return await zip.generateAsync({ type: "blob" });
 }

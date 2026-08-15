@@ -40,6 +40,9 @@ export type Msg = {
   appVisionData?: { appName: string; elementsCount: number; domStructure: string; bypassMode: string };
   projectFiles?: ProjectFile[];
   projectApiKey?: string;
+  projectName?: string;
+  architecturePlan?: string;
+  databaseQueries?: string[];
   effort?: "Low" | "Medium" | "Max Effort" | string;
 };
 
@@ -60,6 +63,10 @@ export type SiteRow = {
   screenshot_url: string | null;
   created_at: string;
   user_id?: string | null;
+  projectName?: string;
+  architecturePlan?: string;
+  databaseQueries?: string[];
+  projectFiles?: ProjectFile[];
 };
 
 export type ApiKeyRow = {

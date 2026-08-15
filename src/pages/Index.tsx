@@ -15,7 +15,7 @@ import {
   Zap, Edit3, Trash2, Bot, Terminal as TermIcon,
   ChevronLeft, ChevronRight, ShieldCheck, LogIn, LogOut, Tag,
   KeyRound, Plus, Menu, Volume2, VolumeX, LayoutGrid,
-  Layers, Globe2, CreditCard, BookOpen,
+  Layers, Globe2, CreditCard, BookOpen, FolderTree, Database, Box
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
@@ -33,7 +33,7 @@ import {
   CLIENT_ID, ONLINE_COMPILER_API_KEY, ONBOARDING_KEY, AI_SYSTEM_PROMPT
 } from "../constants";
 import {
-  getDailyRemaining, spendDailyCredit, generateProjectApiKey, injectAIBridge, parseAIResponse, safeUUID
+  getDailyRemaining, spendDailyCredit, generateProjectApiKey, injectAIBridge, parseAIResponse, safeUUID, exportProjectToZip
 } from "../utils";
 import { MessageList } from "../components/MessageList";
 import { ChatBottomBar } from "../components/ChatBottomBar";
@@ -41,6 +41,9 @@ import { AdminDialog } from "../components/AdminDialog";
 import { runAutonomousAgent } from "../lib/agentEngine";
 import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import UserProfilePopover from "../components/UserProfilePopover";
+import { ProjectFileTree } from "../components/ProjectFileTree";
+import { DatabaseSchemaViewer } from "../components/DatabaseSchemaViewer";
+import { MultiFileSandboxPreview } from "../components/MultiFileSandboxPreview";
 
 const GOOGLE_CLIENT_ID = "930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.googleusercontent.com";
 
@@ -1081,11 +1084,15 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         id: safeUUID(),
         prompt: input || "(sohbet)",
         code: parsed.code || finalChat || "(Boş)",
-        type: (parsed.codeType || "chat") as any,
+        type: (parsed.codeType || (parsed.projectFiles?.length ? "react" : "chat")) as any,
         model,
         created_at: new Date().toISOString(),
         published_url: null,
         screenshot_url: null,
+        projectName: parsed.projectName,
+        architecturePlan: parsed.architecturePlan,
+        databaseQueries: parsed.databaseQueries,
+        projectFiles: processedFiles,
       };
       saveProjectLocally(newLocalProject);
 
@@ -1318,14 +1325,23 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
           <button aria-label="Önizlemeyi kapat" className="fixed inset-x-0 top-14 bottom-0 z-30 bg-stone-900/15 backdrop-blur-[1px] md:hidden" onClick={() => setPreviewOpen(false)} />
         )}
         {previewOpen && (
-          <main className="fixed right-0 top-14 bottom-0 z-40 flex w-[92vw] max-w-[760px] flex-col overflow-hidden bg-stone-50/95 order-2 backdrop-blur-xl animate-slide-in-right border-l border-stone-200 shadow-2xl md:relative md:inset-auto md:z-auto md:w-auto md:max-w-none md:bg-stone-50/70 md:shadow-none">
+          <main className="fixed right-0 top-14 bottom-0 z-40 flex w-[92vw] max-w-[850px] flex-col overflow-hidden bg-stone-50/95 order-2 backdrop-blur-xl animate-slide-in-right border-l border-stone-200 dark:border-stone-800 shadow-2xl md:relative md:inset-auto md:z-auto md:w-auto md:max-w-none md:bg-stone-50/70 dark:md:bg-stone-900/40 md:shadow-none">
             <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col overflow-hidden">
-              <div className="border-b border-stone-200 bg-white/70 backdrop-blur-xl px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
-                <TabsList className="bg-stone-100 border border-stone-200 rounded-full p-1 h-auto">
-                  <TabsTrigger value="preview" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600"><Eye className="w-3.5 h-3.5 mr-1.5" /> Önizleme</TabsTrigger>
-                  <TabsTrigger value="code" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600"><Code2 className="w-3.5 h-3.5 mr-1.5" /> Kod</TabsTrigger>
-                  <TabsTrigger value="terminal" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600"><TermIcon className="w-3.5 h-3.5 mr-1.5" /> Terminal</TabsTrigger>
-                  <TabsTrigger value="logs" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600">
+              <div className="border-b border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-900/70 backdrop-blur-xl px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
+                <TabsList className="bg-stone-100 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-full p-1 h-auto flex flex-wrap gap-1">
+                  <TabsTrigger value="preview" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600 dark:text-stone-300">
+                    <Eye className="w-3.5 h-3.5 mr-1.5 text-emerald-500" /> Canlı Önizleme
+                  </TabsTrigger>
+                  <TabsTrigger value="files" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600 dark:text-stone-300">
+                    <FolderTree className="w-3.5 h-3.5 mr-1.5 text-amber-500" /> Proje Dosyaları
+                  </TabsTrigger>
+                  <TabsTrigger value="database" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600 dark:text-stone-300">
+                    <Database className="w-3.5 h-3.5 mr-1.5 text-cyan-500" /> Veritabanı / SQL
+                  </TabsTrigger>
+                  <TabsTrigger value="terminal" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600 dark:text-stone-300">
+                    <TermIcon className="w-3.5 h-3.5 mr-1.5" /> Terminal
+                  </TabsTrigger>
+                  <TabsTrigger value="logs" className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-stone-900 data-[state=active]:text-white text-stone-600 dark:text-stone-300">
                     <Activity className="w-3.5 h-3.5 mr-1.5" /> Aktivite
                     {(busy || publishing) && <span className="ml-1.5 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
                   </TabsTrigger>
@@ -1345,110 +1361,56 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
                       {smartEdit ? <><Check className="w-4 h-4" /> Kaydet</> : <><Wand2 className="w-4 h-4" /> Akıllı Düzenle</>}
                     </Button>
                   )}
-                  {tab === "preview" && codeType !== "react" && (
-                    <div className="flex items-center gap-0.5 bg-stone-100 border border-stone-200 rounded-full p-0.5">
-                      <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 rounded-full ${device === "desktop" ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-200"}`} onClick={() => setDevice("desktop")}><Monitor className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 rounded-full ${device === "tablet" ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-200"}`} onClick={() => setDevice("tablet")}><Tablet className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 rounded-full ${device === "mobile" ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-200"}`} onClick={() => setDevice("mobile")}><Smartphone className="w-3.5 h-3.5" /></Button>
-                    </div>
-                  )}
-                  {tab === "code" && code && !editing && (
-                    <>
-                      <Button variant="ghost" size="sm" className="rounded-full bg-white border border-stone-200 hover:bg-stone-50 text-stone-700" onClick={startEdit}><Edit3 className="w-4 h-4" /> Düzenle</Button>
-                      <Button variant="ghost" size="sm" className="rounded-full bg-white border border-stone-200 hover:bg-stone-50 text-stone-700" onClick={handleCopy}>{copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copied ? "Kopyalandı" : "Kopyala"}</Button>
-                    </>
-                  )}
-                  {tab === "code" && editing && (
-                    <>
-                      <Button variant="ghost" size="sm" className="rounded-full bg-white border border-stone-200 hover:bg-stone-50 text-stone-700" onClick={() => setEditing(false)}><X className="w-4 h-4" /> İptal</Button>
-                      <Button size="sm" className="rounded-full bg-stone-900 text-white hover:bg-stone-800" onClick={saveEdit}><Check className="w-4 h-4" /> Kaydet</Button>
-                    </>
-                  )}
                 </div>
               </div>
 
-              <TabsContent value="preview" className="flex-1 m-0 p-4 overflow-auto flex justify-center">
-                <div className="bg-white rounded-xl shadow-lg ring-1 ring-stone-200 overflow-hidden transition-all" style={{ width: deviceWidth, maxWidth: "100%", height: "100%" }}>
-                  <iframe ref={iframeRef} src={previewSrc} className="w-full h-full border-0" title="preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation-by-user-activation" />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="code" className="flex-1 m-0 overflow-hidden flex">
+              {/* 1. CANLI ÖNİZLEME SEKMESİ */}
+              <TabsContent value="preview" className="flex-1 m-0 p-3 sm:p-4 overflow-auto flex flex-col justify-center">
                 {(() => {
-                  const lastProjectMsg = [...messages].reverse().find(m => m.role === "assistant" && m.projectFiles && m.projectFiles.length > 0);
-                  const projFiles = lastProjectMsg?.projectFiles;
-                  
-                  if (editing) {
-                    return <Textarea value={editedCode} onChange={e => setEditedCode(e.target.value)} className="h-full w-full font-mono text-xs rounded-none border-0 resize-none bg-stone-950 text-amber-100/90" />;
-                  }
-                  
-                  if (projFiles && projFiles.length > 0) {
+                  const lastProjectMsg = [...messages].reverse().find(m => m.role === "assistant" && (m.projectFiles?.length || m.code));
+                  if (lastProjectMsg?.projectFiles && lastProjectMsg.projectFiles.length > 0) {
                     return (
-                      <div className="flex h-full w-full">
-                        <div className="w-56 shrink-0 bg-stone-950 border-r border-stone-800 overflow-auto">
-                          <div className="px-3 py-2.5 border-b border-stone-800 flex items-center gap-1.5">
-                            <Layers className="w-3.5 h-3.5 text-amber-400" />
-                            <span className="text-[11px] font-bold text-stone-300 uppercase tracking-wider">Proje Dosyaları</span>
-                          </div>
-                          {projFiles.map((f, i) => {
-                            const icon = f.path.endsWith('.env') ? '🔐' : f.path.endsWith('.html') ? '🌐' : f.path.endsWith('.css') ? '🎨' : f.path.endsWith('.tsx') || f.path.endsWith('.jsx') ? '⚛️' : f.path.endsWith('.js') || f.path.endsWith('.ts') ? '📜' : f.path.endsWith('.json') ? '📋' : '📁';
-                            const isActive = (selectedFileIdx ?? 0) === i;
-                            return (
-                              <button
-                                key={i}
-                                onClick={() => setSelectedFileIdx(i)}
-                                className={`w-full text-left px-3 py-1.5 text-xs font-mono flex items-center gap-2 transition border-l-2 ${
-                                  isActive 
-                                    ? 'bg-stone-800/80 text-white border-amber-500' 
-                                    : 'text-stone-400 hover:bg-stone-900 hover:text-stone-200 border-transparent'
-                                }`}
-                              >
-                                <span className="text-sm shrink-0">{icon}</span>
-                                <span className="truncate">{f.path}</span>
-                              </button>
-                            );
-                          })}
-                          {lastProjectMsg?.projectApiKey && (
-                            <div className="mx-2 mt-3 mb-2 p-2 rounded-lg bg-emerald-950/60 border border-emerald-800/50 text-[10px]">
-                              <div className="flex items-center gap-1 text-emerald-400 font-bold mb-1">
-                                <KeyRound className="w-3 h-3" /> API Key
-                              </div>
-                              <code className="text-emerald-300/90 break-all text-[9px]">{lastProjectMsg.projectApiKey}</code>
-                            </div>
-                          )}
-                          <button 
-                            onClick={downloadProjectFiles}
-                            className="mx-2 mt-2 mb-3 w-[calc(100%-16px)] flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-lg"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            Projeyi İndir ({projFiles.length} dosya)
-                          </button>
-                        </div>
-                        <ScrollArea className="flex-1">
-                          <div className="flex items-center justify-between px-4 py-2 bg-stone-900/80 border-b border-stone-800 sticky top-0 z-10">
-                            <span className="text-xs font-mono text-stone-300">
-                              {projFiles[selectedFileIdx ?? 0]?.path || "Dosya seçin"}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                              projFiles[selectedFileIdx ?? 0]?.lang === 'html' ? 'bg-orange-950 text-orange-300' :
-                              projFiles[selectedFileIdx ?? 0]?.lang === 'css' ? 'bg-blue-950 text-blue-300' :
-                              projFiles[selectedFileIdx ?? 0]?.lang === 'javascript' ? 'bg-yellow-950 text-yellow-300' :
-                              projFiles[selectedFileIdx ?? 0]?.lang === 'tsx' ? 'bg-sky-950 text-sky-300' :
-                              'bg-stone-800 text-stone-300'
-                            }`}>{projFiles[selectedFileIdx ?? 0]?.lang}</span>
-                          </div>
-                          <pre className="p-4 text-xs font-mono leading-relaxed bg-stone-950 text-amber-100/90 min-h-full">
-                            <code>{projFiles[selectedFileIdx ?? 0]?.content || "// Dosya seçin..."}</code>
-                          </pre>
-                        </ScrollArea>
-                      </div>
+                      <MultiFileSandboxPreview
+                        files={lastProjectMsg.projectFiles}
+                        projectName={lastProjectMsg.projectName || "SaaS Projesi"}
+                        databaseQueries={lastProjectMsg.databaseQueries || []}
+                        onOpenFilesTab={() => setTab("files")}
+                        onOpenDatabaseTab={() => setTab("database")}
+                      />
                     );
                   }
-                  
                   return (
-                    <ScrollArea className="h-full w-full">
-                      <pre className="p-4 text-xs font-mono leading-relaxed bg-stone-950 text-amber-100/90 min-h-full"><code>{code || "// Kod burada görünecek..."}</code></pre>
-                    </ScrollArea>
+                    <div className="bg-white dark:bg-stone-900 rounded-xl shadow-lg ring-1 ring-stone-200 dark:ring-stone-800 overflow-hidden transition-all h-full" style={{ width: deviceWidth, maxWidth: "100%" }}>
+                      <iframe ref={iframeRef} src={previewSrc} className="w-full h-full border-0" title="preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation-by-user-activation" />
+                    </div>
+                  );
+                })()}
+              </TabsContent>
+
+              {/* 2. PROJE DOSYALARI & KOD EDİTÖRÜ */}
+              <TabsContent value="files" className="flex-1 m-0 p-3 sm:p-4 overflow-hidden flex flex-col">
+                {(() => {
+                  const lastProjectMsg = [...messages].reverse().find(m => m.role === "assistant" && (m.projectFiles?.length || m.code));
+                  const projFiles = lastProjectMsg?.projectFiles || (code ? [{ path: "index.html", content: code, lang: "html" }] : []);
+                  return (
+                    <ProjectFileTree
+                      files={projFiles}
+                      projectName={lastProjectMsg?.projectName || "saas-project"}
+                      databaseQueries={lastProjectMsg?.databaseQueries || []}
+                    />
+                  );
+                })()}
+              </TabsContent>
+
+              {/* 3. VERİTABANI / SQL ŞEMASI */}
+              <TabsContent value="database" className="flex-1 m-0 p-3 sm:p-4 overflow-hidden flex flex-col">
+                {(() => {
+                  const lastProjectMsg = [...messages].reverse().find(m => m.role === "assistant" && (m.databaseQueries?.length || m.projectFiles?.length));
+                  return (
+                    <DatabaseSchemaViewer
+                      sqlQueries={lastProjectMsg?.databaseQueries || []}
+                      projectName={lastProjectMsg?.projectName || "saas-app"}
+                    />
                   );
                 })()}
               </TabsContent>
