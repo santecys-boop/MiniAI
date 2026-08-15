@@ -106,7 +106,7 @@ export function ChatBottomBar({
         attachPopoverNode={attachPopover}
         busy={busy}
         placeholder="Mesaj yazın veya konuşmak için dokunun..."
-        models={["Mini AI Hızlı", "Uzman Kodlayıcı"]}
+        models={["Mini AI Hızlı", "Mini AI Groq", "Mini AI Pro"]}
         efforts={["Low", "Medium", "Max Effort"]}
       />
     </div>
