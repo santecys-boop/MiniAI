@@ -1,0 +1,5 @@
+/site/:id        https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/view-site/:id   200!
+/api/generate   https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/generate-site   200!
+/api/generate/* https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/generate-site   200!
+/api/*          https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/:splat          200!
+/*              /index.html                                                            200
