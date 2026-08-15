@@ -40,6 +40,7 @@ import { ChatBottomBar } from "../components/ChatBottomBar";
 import { AdminDialog } from "../components/AdminDialog";
 import { runAutonomousAgent } from "../lib/agentEngine";
 import { ImagePreviewModal } from "../components/ImagePreviewModal";
+import UserProfilePopover from "../components/UserProfilePopover";
 
 const GOOGLE_CLIENT_ID = "930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.googleusercontent.com";
 
@@ -1270,22 +1271,24 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
             </button>
           </div>
           <div className="flex items-center gap-2">
-            {user && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white shadow-sm border border-stone-200 text-xs font-medium text-stone-800">
-                {user.avatar || user.user_metadata?.avatar_url ? (
-                  <img src={user.avatar || user.user_metadata?.avatar_url} alt="Avatar" className="w-5 h-5 rounded-full object-cover" />
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-700 flex items-center justify-center text-[10px] font-bold">
-                    {(user.name || user.email || "U")[0].toUpperCase()}
-                  </div>
-                )}
-                <span className="hidden sm:inline truncate max-w-[110px]">{user.name || user.email?.split("@")[0]}</span>
-              </div>
-            )}
-            
-            <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100" title="Admin Paneli" onClick={() => setAdminPanelOpen(true)}>
-              <ShieldCheck className="w-5 h-5" />
-            </Button>
+            <UserProfilePopover
+              user={user}
+              isGuest={isGuest}
+              credits={credits}
+              onSignOut={() => {
+                if (isGuest) {
+                  localStorage.removeItem("mini_ai_guest_mode");
+                  window.location.href = "/auth";
+                } else {
+                  logout();
+                }
+              }}
+              onOpenPricing={() => setPricingOpen(true)}
+              onOpenApiKeys={() => setApiKeysOpen(true)}
+              onNameUpdated={(name) => {
+                setCredits(getCredits());
+              }}
+            />
             <button
               onClick={toggleMute}
               className="w-10 h-10 rounded-full bg-white shadow-sm border border-stone-200 flex items-center justify-center hover:bg-stone-50 transition"
