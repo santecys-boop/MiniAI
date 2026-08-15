@@ -6,37 +6,21 @@ export async function hashStr(s: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+import { getCredits, spendCredit, isUnlimited } from "./lib/credits";
+
 export function getDailyUsage(): { count: number; resetTime: number } {
-  const data = localStorage.getItem("mini_ai_daily_usage");
-  const now = Date.now();
-  const oneDayMs = 24 * 60 * 60 * 1000;
-  if (!data) {
-    const d = { count: 0, resetTime: now + oneDayMs };
-    localStorage.setItem("mini_ai_daily_usage", JSON.stringify(d));
-    return d;
-  }
-  try {
-    const parsed = JSON.parse(data);
-    if (now > parsed.resetTime) {
-      const reset = { count: 0, resetTime: now + oneDayMs };
-      localStorage.setItem("mini_ai_daily_usage", JSON.stringify(reset));
-      return reset;
-    }
-    return parsed;
-  } catch {
-    return { count: 0, resetTime: now + oneDayMs };
-  }
+  const c = getCredits();
+  return { count: c.max - c.count, resetTime: Date.now() + c.nextRefillIn };
 }
 
 export function spendDailyCredit(): number {
-  const u = getDailyUsage();
-  const next = { count: u.count + 1, resetTime: u.resetTime };
-  localStorage.setItem("mini_ai_daily_usage", JSON.stringify(next));
-  return next.count;
+  spendCredit();
+  return getDailyRemaining();
 }
 
 export function getDailyRemaining(): number {
-  return Math.max(0, 35 - getDailyUsage().count);
+  if (isUnlimited()) return 999;
+  return getCredits().count;
 }
 
 export function getUsedCoupons(): string[] {

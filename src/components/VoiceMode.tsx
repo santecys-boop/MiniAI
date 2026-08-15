@@ -41,6 +41,7 @@ import {
 } from "react";
 import { X, Mic, Plus, Check, ArrowUp, Volume2, Pause } from "lucide-react";
 import { toast } from "sonner";
+import { getCredits, spendCredit, isUnlimited } from "@/lib/credits";
 
 /* ════════════════════════════════════════════════════════════════════════════
  *  SABİTLER & TİPLER
@@ -1180,6 +1181,18 @@ export default function VoiceMode({
   /** Ortak sohbet zinciri: metin al → cevap üret → seslendir (yazı & ses ortak) */
   async function converse(userText: string) {
     if (closedRef.current) return;
+
+    if (!isUnlimited()) {
+      const c = getCredits();
+      if (c.count <= 0) {
+        toast.error("⚠️ Krediniz bitti! Sesli modu kullanmak için kredinizin yenilenmesini bekleyin veya PRO plana geçin.");
+        setState("idle");
+        onClose?.();
+        return;
+      }
+      spendCredit();
+    }
+
     setCaption(userText);
     setState("thinking");
 

@@ -10,8 +10,9 @@ type CreditState = { count: number; lastRefill: number };
 
 export function initDemoCredits() {
   try {
-    if (!localStorage.getItem("mini_demo_initialized")) {
-      localStorage.setItem("mini_demo_initialized", "1");
+    const exp = localStorage.getItem(DEMO_EXPIRES_KEY);
+    const credits = localStorage.getItem(DEMO_CREDITS_KEY);
+    if (!exp || !credits) {
       const threeDaysLater = Date.now() + 3 * 24 * 60 * 60 * 1000;
       localStorage.setItem(DEMO_EXPIRES_KEY, threeDaysLater.toString());
       localStorage.setItem(DEMO_CREDITS_KEY, "500");

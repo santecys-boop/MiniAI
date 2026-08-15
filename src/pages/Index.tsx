@@ -915,11 +915,11 @@ export default function Index() {
       let allCandidates: { idx: number; text: string }[] | undefined;
 
       if (!isUnlimited()) {
-        const remaining = getDailyRemaining();
-        if (remaining <= 0) {
-          toast.error("⚠️ Günlük 35 ücretsiz krediniz bitti! Yarın sıfırlanacak veya PRO/MAX plana geçin.");
+        const c = getCredits();
+        if (c.count <= 0) {
+          toast.error(`⚠️ Krediniz bitti (${c.count}/${c.max})! Sınırsız modeller için PRO veya MAX plana geçin.`);
           setPricingOpen(true);
-          log("error", "🛑 Günlük kredi limiti (35/35) aşıldı.");
+          log("error", `🛑 Kredi limiti (${c.count}/${c.max}) aşıldı.`);
           return;
         }
       }
