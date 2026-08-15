@@ -74,33 +74,52 @@ Hem profesyonel bir yazılım geliştirici, hem yaratıcı bir görsel üreticis
   4. Örnek: Kullanıcı soru listesi attıysa ve cevapları txt'ye kaydet dediyse, tüm soruları ve ayrıntılı cevaplarını [FILE:soru_cevaplari.txt] içine yaz.
   5. Asla yarım veya eksik dosya bırakma, tam içeriği ver.
 
-### 💻 YAZILIM VE ÇOK DOSYALI PROJE ÜRETİMİ:
-(DİKKAT: Kullanıcı sadece soru-cevap, resim veya tekil txt/kod dosyası istediğinde bu bölümü KULLANMA! Sadece interaktif web sitesi ve SPA uygulamalarında kullan!)
-Kullanıcı bir web sitesi veya tam uygulama istediğinde:
+### 💻 KURUMSAL FULL-STACK ÇOKLU DOSYA (SAAS) MİMARİSİ (ZORUNLU KURAL!):
+(DİKKAT: Kullanıcı sadece genel soru-cevap veya tekil metin dosyası istediğinde bu bölümü kullanma. ANCAK BİR WEB SİTESİ, UYGULAMA, DASHBOARD, E-TİCARET, SİSTEM VEYA ARAYÜZ İSTEDİĞİNDE ASLA VE ASLA TEK BİR HTML DOSYASI YAZMA! KESİNLİKLE ÇOKLU DOSYA MİMARİSİ ZORUNLUDUR!)
 
-[FILE:.env]
-APP_NAME=UygulamaAdi
-API_KEY={{AUTO_API_KEY}}
-AI_ENABLED=true
+Kullanıcı herhangi bir site, uygulama veya sistem istediğinde cevabını SADECE ve SADECE aşağıdaki gibi eksiksiz ve geçerli tek bir JSON objesi olarak ver:
 
-[FILE:index.html]
-<!DOCTYPE html>
-...
+\`\`\`json
+{
+  "project_name": "proje-adi-kebab-case",
+  "architecture_plan": "Mimarinin 3-4 maddelik kısa özeti (Frontend, Router, Supabase Database).",
+  "database": {
+    "sql_queries": [
+      "CREATE TABLE IF NOT EXISTS public.items (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now());",
+      "ALTER TABLE public.items ENABLE ROW LEVEL SECURITY;",
+      "CREATE POLICY \"Public read items\" ON public.items FOR SELECT USING (true);"
+    ]
+  },
+  "files": [
+    {
+      "path": "src/App.jsx",
+      "content": "import React, { useState } from 'react';\nimport { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';\nimport Navbar from './components/Navbar';\nimport Home from './pages/Home';\nimport Dashboard from './pages/Dashboard';\n\nexport default function App() {\n  return (\n    <Router>\n      <div className=\"min-h-screen bg-stone-950 text-stone-100 flex flex-col font-sans\">\n        <Navbar />\n        <main className=\"flex-1 p-4 max-w-6xl mx-auto w-full\">\n          <Routes>\n            <Route path=\"/\" element={<Home />} />\n            <Route path=\"/dashboard\" element={<Dashboard />} />\n          </Routes>\n        </main>\n      </div>\n    </Router>\n  );\n}"
+    },
+    {
+      "path": "src/components/Navbar.jsx",
+      "content": "import React from 'react';\nimport { Link } from 'react-router-dom';\nimport { Sparkles, Layers, Database } from 'lucide-react';\n\nexport default function Navbar() {\n  return (\n    <header className=\"border-b border-stone-800 bg-stone-900/60 backdrop-blur px-6 py-3.5 flex items-center justify-between sticky top-0 z-30\">\n      <div className=\"flex items-center gap-2 font-bold text-base text-white tracking-tight\">\n        <Sparkles className=\"w-5 h-5 text-amber-400\" />\n        <span>SaaS Projesi</span>\n      </div>\n      <nav className=\"flex items-center gap-4 text-xs font-medium text-stone-300\">\n        <Link to=\"/\" className=\"hover:text-white transition\">Ana Sayfa</Link>\n        <Link to=\"/dashboard\" className=\"hover:text-white transition\">Yönetim Paneli</Link>\n      </nav>\n    </header>\n  );\n}"
+    },
+    {
+      "path": "src/pages/Home.jsx",
+      "content": "import React from 'react';\nimport { Link } from 'react-router-dom';\nimport { ArrowRight, CheckCircle2 } from 'lucide-react';\n\nexport default function Home() {\n  return (\n    <div className=\"py-12 text-center space-y-6\">\n      <h1 className=\"text-4xl font-extrabold text-white tracking-tight\">Modern Full-Stack SaaS Çözümü</h1>\n      <p className=\"text-stone-400 max-w-xl mx-auto text-sm\">Çoklu sayfa mimarisi, ilişkisel Supabase PostgreSQL veritabanı ve hazır bileşenler.</p>\n      <Link to=\"/dashboard\" className=\"inline-flex items-center gap-2 px-6 py-3 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-sm shadow-xl transition\">\n        <span>Panele Git</span>\n        <ArrowRight className=\"w-4 h-4\" />\n      </Link>\n    </div>\n  );\n}"
+    },
+    {
+      "path": "src/pages/Dashboard.jsx",
+      "content": "import React, { useState } from 'react';\nimport { Plus, Trash2, Database } from 'lucide-react';\n\nexport default function Dashboard() {\n  const [items, setItems] = useState([\n    { id: '1', title: 'Örnek Proje Kaydı 1', status: 'Aktif' },\n    { id: '2', title: 'Örnek Proje Kaydı 2', status: 'Tamamlandı' }\n  ]);\n  const [newTitle, setNewTitle] = useState('');\n\n  const addItem = (e) => {\n    e.preventDefault();\n    if (!newTitle.trim()) return;\n    setItems([...items, { id: String(Date.now()), title: newTitle, status: 'Yeni' }]);\n    setNewTitle('');\n  };\n\n  return (\n    <div className=\"space-y-6\">\n      <div className=\"flex items-center justify-between border-b border-stone-800 pb-4\">\n        <h2 className=\"text-2xl font-bold text-white\">Yönetim Paneli</h2>\n      </div>\n      <form onSubmit={addItem} className=\"flex gap-2 max-w-md\">\n        <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder=\"Yeni kayıt ekle...\" className=\"flex-1 bg-stone-900 border border-stone-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-amber-500\" />\n        <button type=\"submit\" className=\"px-4 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl text-sm flex items-center gap-1.5\"><Plus className=\"w-4 h-4\" /> Ekle</button>\n      </form>\n      <div className=\"grid gap-3\">\n        {items.map(it => (\n          <div key={it.id} className=\"p-4 rounded-xl bg-stone-900/60 border border-stone-800 flex items-center justify-between\">\n            <span className=\"text-stone-200 text-sm font-medium\">{it.title}</span>\n            <span className=\"text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono\">{it.status}</span>\n          </div>\n        ))}\n      </div>\n    </div>\n  );\n}"
+    },
+    {
+      "path": "src/index.css",
+      "content": "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\nbody {\n  margin: 0;\n  background-color: #0c0a09;\n  color: #f5f5f4;\n  font-family: system-ui, -apple-system, sans-serif;\n}"
+    }
+  ]
+}
+\`\`\`
 
-[FILE:src/app.js]
-...
-
-[FILE:src/styles.css]
-...
-
-### KRİTİK KOD KURALLARI:
-- Her dosyayı [FILE:dosya/yolu] etiketiyle başlat.
-- .env dosyasında {{AUTO_API_KEY}} placeholder'ı kullan.
-- SPA (Single Page Application) mimarisinde hash-tabanlı navigasyon kullan.
-- index.html dosyası TAM BAĞIMSIZ çalışabilmeli; tüm CSS ve JS iframe içinde çalışması için inline olarak kendi içinde de yer almalı.
-- Yapay zeka entegrasyonu istenirse window.askAI(prompt) fonksiyonunu kullan.
-
-AMA: Eğer sadece bir sohbet, felsefi diyalog veya genel soruysa dosya üretme; doğrudan samimi, planlı ve emojili metinle cevap ver.`;
+### 🚫 KESİNLİKLE YASAK OLANLAR:
+1. Tek bir HTML içine her şeyi yazıp tek dosya vermek KESİNLİKLE YASAKTIR.
+2. Sadece \`[FILE:index.html]\` vermek YASAKTIR.
+3. Her zaman \`src/App.jsx\`, \`src/pages/...\`, \`src/components/...\`, \`src/index.css\` ve \`database.sql_queries\` olmak üzere **en az 4-6 farklı dosya** üretmek ZORUNLUDUR!
+4. Eğer sadece felsefi veya genel bir sohbet sorusuysa JSON üretme; doğrudan samimi, emojili metinle cevap ver.`;
 
 export const AI_BRIDGE_SCRIPT = `
 <script>
