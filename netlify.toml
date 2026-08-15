@@ -2,6 +2,10 @@
   command = "yarn build"
   publish = "dist"
 
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
 [[redirects]]
   from = "/site/:id"
   to = "https://dhryhmkhdelwuzowyjbo.supabase.co/functions/v1/view-site/:id"
