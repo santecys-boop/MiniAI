@@ -1,6 +1,7 @@
 import RealTerminal from "@/components/RealTerminal";
 import VoiceMode from "@/components/VoiceMode";
 import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +15,7 @@ import {
   Zap, Edit3, Trash2, Bot, Terminal as TermIcon,
   ChevronLeft, ChevronRight, ShieldCheck, LogIn, LogOut, Tag,
   KeyRound, Plus, Menu, Volume2, VolumeX, LayoutGrid,
-  Layers, Globe2, CreditCard,
+  Layers, Globe2, CreditCard, BookOpen,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
@@ -1667,24 +1668,44 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
       </Dialog>
 
       <Dialog open={apiKeysOpen} onOpenChange={setApiKeysOpen}>
-        <DialogContent className="rounded-2xl max-w-md" style={{ backgroundColor: "#faf7f5" }}>
+        <DialogContent className="rounded-2xl max-w-lg" style={{ backgroundColor: "#faf7f5" }}>
           <DialogHeader>
-            <DialogTitle>API Anahtarları</DialogTitle>
+            <DialogTitle className="flex items-center justify-between text-stone-900">
+              <span>API Anahtarları</span>
+              <Link to="/codeapi" onClick={() => setApiKeysOpen(false)} className="text-xs font-semibold text-emerald-600 hover:underline flex items-center gap-1">
+                <BookOpen className="w-3.5 h-3.5" /> Tüm Dokümantasyon
+              </Link>
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             {generatedApiKey && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-mono text-emerald-800 break-all">
-                {generatedApiKey}
-                <p className="mt-1 text-emerald-600 font-sans text-[11px]">Bu anahtarı kopyala — bir daha gösterilmeyecek.</p>
+              <div className="rounded-xl border border-emerald-300 bg-emerald-50/90 p-3.5 text-xs font-mono text-emerald-900 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-800 font-sans text-xs flex items-center gap-1.5">
+                    <Check className="w-4 h-4 text-emerald-600" /> Yeni Üretilen Gerçek API Anahtarınız:
+                  </span>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(generatedApiKey); toast.success("API Anahtarı kopyalandı!"); }}
+                    className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-sans text-[11px] font-medium"
+                  >
+                    Kopyala
+                  </button>
+                </div>
+                <div className="p-2 rounded-lg bg-white/80 border border-emerald-200 break-all select-all font-bold">
+                  {generatedApiKey}
+                </div>
+                <p className="text-emerald-700 font-sans text-[11px]">
+                  Aşağıdaki hazır kod bloklarına bu anahtarınız otomatik yerleştirilmiştir!
+                </p>
               </div>
             )}
             <div className="flex gap-2">
-              <Input value={apiKeyLabel} onChange={e => setApiKeyLabel(e.target.value)} placeholder="Anahtar etiketi (opsiyonel)" className="rounded-xl border-stone-200 flex-1" />
-              <Button className="rounded-xl bg-stone-900 text-white hover:bg-stone-800 shrink-0" onClick={createApiKey} disabled={apiKeyBusy}>
-                {apiKeyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Üret"}
+              <Input value={apiKeyLabel} onChange={e => setApiKeyLabel(e.target.value)} placeholder="Anahtar etiketi (opsiyonel)" className="rounded-xl border-stone-200 flex-1 bg-white" />
+              <Button className="rounded-xl bg-stone-900 text-white hover:bg-stone-800 shrink-0 font-bold" onClick={createApiKey} disabled={apiKeyBusy}>
+                {apiKeyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yeni Anahtar Üret"}
               </Button>
             </div>
-            <ScrollArea className="max-h-64">
+            <ScrollArea className="max-h-48">
               <div className="space-y-2">
                 {apiKeys.map(k => (
                   <div key={k.id} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2">
@@ -1692,17 +1713,49 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
                       <p className="text-sm font-medium text-stone-900 truncate">{k.label}</p>
                       <p className="text-xs text-stone-400 font-mono">{k.masked_key}</p>
                     </div>
-                    <button onClick={() => toggleApiKey(k.id, k.active)} className={`w-8 h-8 rounded-full flex items-center justify-center transition ${k.active ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-stone-100 text-stone-400 hover:bg-stone-200"}`}>
+                    <button onClick={() => toggleApiKey(k.id, k.active)} title={k.active ? "Aktif" : "Pasif"} className={`w-8 h-8 rounded-full flex items-center justify-center transition ${k.active ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-stone-100 text-stone-400 hover:bg-stone-200"}`}>
                       <Zap className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => deleteApiKey(k.id)} className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 text-stone-400 hover:bg-rose-100 hover:text-rose-600 transition">
+                    <button onClick={() => deleteApiKey(k.id)} title="Sil" className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 text-stone-400 hover:bg-rose-100 hover:text-rose-600 transition">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
-                {apiKeys.length === 0 && <p className="text-sm text-stone-400 text-center py-4">Henüz anahtar yok</p>}
+                {apiKeys.length === 0 && <p className="text-sm text-stone-400 text-center py-2">Henüz anahtar yok</p>}
               </div>
             </ScrollArea>
+
+            {/* Koda Nasıl Eklenir? Gerçek API Key ile Entegrasyon */}
+            <div className="border-t border-stone-200 pt-3 space-y-2">
+              <p className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                <Code2 className="w-4 h-4 text-emerald-600" /> Koda Nasıl Eklenir? (Canlı Entegrasyon):
+              </p>
+              <div className="relative rounded-xl border border-stone-800 bg-stone-950 p-3 text-[11px] font-mono text-stone-200 overflow-auto max-h-36">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const codeText = `// JavaScript / Node.js Entegrasyonu\nconst res = await fetch("https://radiant-liger-e14789.netlify.app/api/generate", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${generatedApiKey || (apiKeys[0]?.key_prefix ? apiKeys[0].key_prefix + '...' : 'mini_xxxxxxxxxxxxxxxx')}",\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({ prompt: "Portfolyo web sitesi", type: "html" })\n});\nconst data = await res.json();\nconsole.log(data);`;
+                    navigator.clipboard.writeText(codeText);
+                    toast.success("Entegrasyon kodu panoya kopyalandı!");
+                  }}
+                  className="absolute top-2 right-2 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[10px] text-stone-300 font-sans"
+                >
+                  Kopyala
+                </button>
+                <pre className="leading-snug">
+{`// JavaScript / Node.js
+const res = await fetch("https://radiant-liger-e14789.netlify.app/api/generate", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer ${generatedApiKey || (apiKeys[0]?.key_prefix ? apiKeys[0].key_prefix + '...' : 'mini_xxxxxxxxxxxxxxxx')}",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ prompt: "Portfolyo sitesi", type: "html" })
+});
+const data = await res.json();`}
+                </pre>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
