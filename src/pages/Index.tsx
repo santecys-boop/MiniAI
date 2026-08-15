@@ -953,6 +953,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
       }
 
       const textFiles = pendingAttachments.filter(a => a.kind === "file" && !/\.zip$/i.test(a.name));
+      const promptWithUser = userName ? `[Kullanıcı: ${userName}]\n${input}` : input;
       let promptToSend = promptWithUser;
       if (textFiles.length > 0) {
         const fileBlocks = textFiles.map(f => `[KULLANICININ YÜKLEDİĞİ DOSYA: ${f.name}]\n${f.data}\n[/KULLANICININ YÜKLEDİĞİ DOSYA]`).join("\n\n");
