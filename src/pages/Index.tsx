@@ -793,8 +793,9 @@ export default function Index() {
     const useAgent = !isFix && wantsSite;
 
     const uploadedFile = !isFix ? pendingAttachments.find(a => a.kind === "file") : undefined;
-    const wantsFileEdit = !isFix && /\b(düzelt|düzenle|değiştir|güncelle|ekle|kaldır|sil|çevir|refactor|fix|edit|update|değistir|dosyay[ıi])\b/.test(lower);
-    const shouldUseFileEdit = !isFix && !!uploadedFile && wantsFileEdit;
+    const isZip = !!uploadedFile && /\.zip$/i.test(uploadedFile.name);
+    const wantsZipEdit = isZip && /\b(düzelt|düzenle|değiştir|güncelle|ekle|kaldır|sil|çevir|refactor|fix|edit|update|değistir)\b/.test(lower);
+    const shouldUseFileEdit = !isFix && wantsZipEdit;
 
     const userMsg: Msg = { role: "user", chat: isFix ? `🔧 Düzelt: ${input}` : isImageOnly ? `🎨 Görsel Üret: ${input}` : input, attachments: pendingAttachments };
     setMessages(m => [...m, userMsg]);
@@ -947,9 +948,11 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         enrichedSystemPrompt += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Kullanıcı bu mesajı özel 'Üret' (Görsel Üretim) butonuyla gönderdi. Bu bir görsel isteğidir! Kesinlikle kod yazma, kod kutusu açma veya [FILE:...] bloğu ekleme! KESİNLİKLE cevabının en başına [IMAGE_GEN] etiketini koyup İngilizce prompt yazmalısın. Örnek: [IMAGE_GEN]yazılacak prompt[/IMAGE_GEN]";
       }
 
+      const textFiles = pendingAttachments.filter(a => a.kind === "file" && !/\.zip$/i.test(a.name));
       let promptToSend = promptWithUser;
-      if (file) {
-        promptToSend += `\n\n[KULLANICININ YÜKLEDİĞİ DOSYA: ${file.name}]\n${file.data}\n[/KULLANICININ YÜKLEDİĞİ DOSYA]\nTalimat: Bu dosyanın içeriğini dikkatle incele, kullanıcının isteğine göre cevapları yaz, analiz et veya düzenle ve sonucu eksiksiz olarak [FILE:${file.name}]...[/FILE] formatında üret.`;
+      if (textFiles.length > 0) {
+        const fileBlocks = textFiles.map(f => `[KULLANICININ YÜKLEDİĞİ DOSYA: ${f.name}]\n${f.data}\n[/KULLANICININ YÜKLEDİĞİ DOSYA]`).join("\n\n");
+        promptToSend += `\n\n${fileBlocks}\n\n[KRİTİK TALİMAT]: Yüklenen dosya(lar)ın içeriğini dikkatle analiz et. Kullanıcının sorusu veya isteği doğrultusunda tam içeriği oluştur ve [FILE:${textFiles[0].name}]...[/FILE] etiketiyle eksiksiz olarak çıktı ver.`;
       }
 
       if (useAgent) {
