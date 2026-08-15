@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useState } from "react";
 
-const ENDPOINT = "https://radiant-liger-e14789.netlify.app/api/generate";
+const ENDPOINT = typeof window !== "undefined" ? `${window.location.origin}/api/generate` : "https://api.miniai.dev/generate";
 
 const curlExample = `curl -X POST "${ENDPOINT}" \\
   -H "Authorization: Bearer mini_xxxxxxxxxxxxxxxx" \\

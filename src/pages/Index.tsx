@@ -1759,12 +1759,13 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
 
               {(() => {
                 const currentKey = generatedApiKey || (apiKeys[0]?.key_prefix ? apiKeys[0].key_prefix + '...' : 'mini_xxxxxxxxxxxxxxxx');
+                const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://api.miniai.dev";
                 
-                const pythonCode = `import requests\n\nAPI_KEY = "${currentKey}"\nurl = "https://radiant-liger-e14789.netlify.app/api/generate"\n\nheaders = {\n    "Authorization": f"Bearer {API_KEY}",\n    "Content-Type": "application/json"\n}\n\ndata = {\n    "prompt": "Modern portfolyo web sitesi",\n    "type": "html"\n}\n\nresponse = requests.post(url, headers=headers, json=data)\nprint(response.json())`;
+                const pythonCode = `import requests\n\nAPI_KEY = "${currentKey}"\nurl = "${baseUrl}/api/generate"\n\nheaders = {\n    "Authorization": f"Bearer {API_KEY}",\n    "Content-Type": "application/json"\n}\n\ndata = {\n    "prompt": "Modern portfolyo web sitesi",\n    "type": "html"\n}\n\nresponse = requests.post(url, headers=headers, json=data)\nprint(response.json())`;
 
-                const jsCode = `// JavaScript / Node.js\nconst API_KEY = "${currentKey}";\n\nconst res = await fetch("https://radiant-liger-e14789.netlify.app/api/generate", {\n  method: "POST",\n  headers: {\n    "Authorization": \`Bearer \${API_KEY}\`,\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({\n    prompt: "Modern portfolyo web sitesi",\n    type: "html"\n  })\n});\n\nconst data = await res.json();\nconsole.log(data);`;
+                const jsCode = `// JavaScript / Node.js\nconst API_KEY = "${currentKey}";\n\nconst res = await fetch("${baseUrl}/api/generate", {\n  method: "POST",\n  headers: {\n    "Authorization": \`Bearer \${API_KEY}\`,\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({\n    prompt: "Modern portfolyo web sitesi",\n    type: "html"\n  })\n});\n\nconst data = await res.json();\nconsole.log(data);`;
 
-                const curlCode = `curl -X POST https://radiant-liger-e14789.netlify.app/api/generate \\\n  -H "Authorization: Bearer ${currentKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "Modern portfolyo", "type": "html"}'`;
+                const curlCode = `curl -X POST ${baseUrl}/api/generate \\\n  -H "Authorization: Bearer ${currentKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "Modern portfolyo", "type": "html"}'`;
 
                 const activeCode = apiCodeLang === "python" ? pythonCode : apiCodeLang === "js" ? jsCode : curlCode;
 
