@@ -1,5 +1,6 @@
 import { AI_BRIDGE_SCRIPT } from "./constants";
 import { ProjectFile } from "./types";
+import { lintAndFixProject } from "./lib/codeLinter";
 
 export async function hashStr(s: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -188,18 +189,21 @@ export function parseAIResponse(raw: string, attachedFileName?: string): FullSta
           });
         }
 
+        // Otomatik JSX ve Hook Linter & Fixer
+        const { files: lintedFiles } = lintAndFixProject(files);
+
         // Ana HTML dosyasını bul veya React dosyasından virtual preview üret
-        const htmlFile = files.find(f => f.path.endsWith(".html") || f.content.includes("<!DOCTYPE"));
-        const mainReact = files.find(f => f.path.includes("App.jsx") || f.path.includes("App.tsx") || f.path.includes("Dashboard"));
+        const htmlFile = lintedFiles.find(f => f.path.endsWith(".html") || f.content.includes("<!DOCTYPE"));
+        const mainReact = lintedFiles.find(f => f.path.includes("App.jsx") || f.path.includes("App.tsx") || f.path.includes("Dashboard"));
 
         return {
-          chat: parsed.architecture_plan ? `🚀 **${parsed.project_name || "Full-Stack SaaS"}** projesi ${files.length} dosya ve veritabanı şemasıyla başarıyla oluşturuldu.` : undefined,
+          chat: parsed.architecture_plan ? `🚀 **${parsed.project_name || "Full-Stack SaaS"}** projesi ${lintedFiles.length} dosya ve veritabanı şemasıyla başarıyla oluşturuldu.` : undefined,
           plan: parsed.architecture_plan,
           projectName: parsed.project_name || "saas-app",
           architecturePlan: parsed.architecture_plan,
           databaseQueries: sqlQueries,
-          projectFiles: files,
-          code: htmlFile?.content || (mainReact ? mainReact.content : (files[0]?.content || undefined)),
+          projectFiles: lintedFiles,
+          code: htmlFile?.content || (mainReact ? mainReact.content : (lintedFiles[0]?.content || undefined)),
           codeType: htmlFile ? "html" : "react"
         };
       }

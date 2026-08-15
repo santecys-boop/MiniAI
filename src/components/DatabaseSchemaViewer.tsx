@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Database, Table, ShieldCheck, Copy, Check, Terminal, Play, Download, Sparkles } from "lucide-react";
+import { Database, Table, ShieldCheck, Copy, Check, Terminal, Play, Download, Sparkles, Code2 } from "lucide-react";
 import { toast } from "sonner";
+import { DatabaseQueryRunner } from "./DatabaseQueryRunner";
 
 interface DatabaseSchemaViewerProps {
   sqlQueries: string[];
@@ -12,7 +13,7 @@ export const DatabaseSchemaViewer: React.FC<DatabaseSchemaViewerProps> = ({
   projectName = "saas-app"
 }) => {
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"tables" | "raw_sql">("tables");
+  const [activeTab, setActiveTab] = useState<"tables" | "runner" | "raw_sql">("tables");
 
   const fullSql = sqlQueries.join("\n\n");
 
@@ -95,7 +96,16 @@ export const DatabaseSchemaViewer: React.FC<DatabaseSchemaViewerProps> = ({
                 activeTab === "tables" ? "bg-stone-800 text-stone-100" : "text-stone-400 hover:text-stone-200"
               }`}
             >
-              Tablo Görünümü
+              Tablo Şeması
+            </button>
+            <button
+              onClick={() => setActiveTab("runner")}
+              className={`px-3 py-1 rounded-lg font-medium transition-colors flex items-center gap-1 ${
+                activeTab === "runner" ? "bg-stone-800 text-emerald-400" : "text-stone-400 hover:text-stone-200"
+              }`}
+            >
+              <Terminal className="w-3 h-3" />
+              <span>SQL Konsolu</span>
             </button>
             <button
               onClick={() => setActiveTab("raw_sql")}
@@ -132,6 +142,8 @@ export const DatabaseSchemaViewer: React.FC<DatabaseSchemaViewerProps> = ({
             <Database className="w-8 h-8 opacity-40" />
             <p className="text-sm">Bu proje için henüz bir SQL şeması oluşturulmadı.</p>
           </div>
+        ) : activeTab === "runner" ? (
+          <DatabaseQueryRunner initialQueries={sqlQueries} projectName={projectName} />
         ) : activeTab === "tables" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {parsedTables.map((tbl, idx) => (
