@@ -8,20 +8,24 @@ export type MessageListProps = {
   messages: Msg[];
   isLoading?: boolean;
   welcomeText: string;
-  welcomeDone: boolean;
+  welcomeDone?: boolean;
   chatEndRef: React.RefObject<HTMLDivElement | null>;
   onImageClick?: (url: string) => void;
+  onVideoClick?: (url: string) => void;
 };
 
-export function MessageList({ messages, isLoading, welcomeText, welcomeDone, chatEndRef, onImageClick }: MessageListProps) {
+export function MessageList({ messages, isLoading, welcomeText, chatEndRef, onImageClick, onVideoClick }: MessageListProps) {
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 select-none">
-        <h2 className="text-[22px] font-semibold text-stone-900 text-center tracking-tight">
-          {welcomeText}
-          {!welcomeDone && (
-            <span className="inline-block w-[2px] h-[1.1em] bg-stone-900 ml-0.5 align-middle animate-pulse" />
-          )}
+        <h2 
+          translate="no" 
+          className="notranslate text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-stone-100 text-center tracking-tight inline-flex items-center justify-center gap-0.5"
+        >
+          <span translate="no" className="notranslate font-extrabold text-stone-900 dark:text-white">
+            {welcomeText}
+          </span>
+          <span className="inline-block w-[3px] h-[1.15em] bg-stone-900 dark:bg-stone-100 ml-0.5 align-middle animate-pulse rounded-full" />
         </h2>
       </div>
     );

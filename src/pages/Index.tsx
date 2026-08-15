@@ -189,23 +189,50 @@ export async function handleVerifySmsOtp(phone: string, token: string): Promise<
   }
 }
 
-// Typewriter hook
-function useTypewriter(text: string, speed = 45) {
+// Infinite Loop Typewriter hook
+function useInfiniteTypewriter(text: string, typeSpeed = 65, deleteSpeed = 35, pauseMs = 2400) {
   const [displayed, setDisplayed] = useState("");
-  const [done, setDone] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   useEffect(() => {
-    setDisplayed("");
-    setDone(false);
-    if (!text) return;
-    let i = 0;
-    const timer = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) { clearInterval(timer); setDone(true); }
-    }, speed);
-    return () => clearInterval(timer);
-  }, [text, speed]);
-  return { displayed, done };
+    let timeout: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+
+    function step() {
+      if (cancelled) return;
+
+      if (!isDeleting) {
+        if (displayed.length < text.length) {
+          timeout = setTimeout(() => {
+            if (!cancelled) setDisplayed(text.slice(0, displayed.length + 1));
+          }, typeSpeed);
+        } else {
+          timeout = setTimeout(() => {
+            if (!cancelled) setIsDeleting(true);
+          }, pauseMs);
+        }
+      } else {
+        if (displayed.length > 0) {
+          timeout = setTimeout(() => {
+            if (!cancelled) setDisplayed(text.slice(0, displayed.length - 1));
+          }, deleteSpeed);
+        } else {
+          timeout = setTimeout(() => {
+            if (!cancelled) setIsDeleting(false);
+          }, 450);
+        }
+      }
+    }
+
+    step();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [displayed, isDeleting, text, typeSpeed, deleteSpeed, pauseMs]);
+
+  return { displayed, isDeleting };
 }
 
 const FN_BASE = `${import.meta.env.VITE_AI_SUPABASE_URL || 'https://dhryhmkhdelwuzowyjbo.supabase.co'}/functions/v1`;
@@ -273,7 +300,7 @@ export default function Index() {
   const [otpInput, setOtpInput] = useState("");
   const [smsStep, setSmsStep] = useState<"phone" | "otp">("phone");
 
-  const { displayed: welcomeText, done: welcomeDone } = useTypewriter("Welcome to Mini AI.", 55);
+  const { displayed: welcomeText } = useInfiniteTypewriter("Welcome to Mini AI.", 65, 35, 2400);
 
   const lastCodeMsg = [...messages].reverse().find(m => m.role === "assistant" && m.code);
   const code = editing ? editedCode : (lastCodeMsg?.code || "");
