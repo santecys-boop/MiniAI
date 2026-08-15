@@ -47,7 +47,7 @@ import { toast } from "sonner";
  * ══════════════════════════════════════════════════════════════════════════ */
 
 const FN_BASE = `${import.meta.env.VITE_AI_SUPABASE_URL || 'https://dhryhmkhdelwuzowyjbo.supabase.co'}/functions/v1`;
-const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const ANON = import.meta.env.VITE_AI_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRocnlobWtoZGVsd3V6b3d5amJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1Mjg4MjgsImV4cCI6MjA5MjEwNDgyOH0.KM8m7NXq0GrIREO9yITXj3DaYN_JgLfkZuZIii-5kTw';
 
 type Msg = { role: "user" | "assistant"; content: string; at: number };
 
@@ -131,20 +131,20 @@ Yapma:
 
 /* ── VAD ayarları ─────────────────────────────────────────────────────────── */
 const VAD = {
-  /** Konuşma bitti sayılacak sessizlik süresi (ms) — doğal konuşma için 1.4 sn */
-  SILENCE_MS: 1400,
+  /** Konuşma bitti sayılacak sessizlik süresi (ms) — düşük = hızlı yanıt */
+  SILENCE_MS: 650,
   /** Bu kadar konuşulmadıysa gönderme (yanlış tetikleme önlemi, ms) */
-  MIN_SPEECH_MS: 500,
+  MIN_SPEECH_MS: 280,
   /** RMS konuşma eşiği — gürültü tabanına eklenir (histerezis: giriş) */
-  ENTER_OFFSET: 12.0,
+  ENTER_OFFSET: 7.5,
   /** RMS konuşma eşiği — histerezis: çıkış (daha düşük) */
-  EXIT_OFFSET: 6.0,
+  EXIT_OFFSET: 4.5,
   /** Gürültü tabanı adaptasyon hızı (0-1, düşük = yavaş) */
   NOISE_ADAPT: 0.02,
   /** Bir cümle max bu kadar sürebilir; sonra otomatik gönderilir (ms) */
   MAX_UTTERANCE_MS: 30_000,
-  /** Ses dosyası en az bu kadar byte olmalı (gürültü önleme) */
-  MIN_BLOB_BYTES: 6_000,
+  /** Ses dosyası en az bu kadar byte olmalı */
+  MIN_BLOB_BYTES: 2_800,
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -840,10 +840,10 @@ function TranscriptSheet({
  * ══════════════════════════════════════════════════════════════════════════ */
 
 export default function VoiceMode({
-  open = true,
+  open,
   onClose,
 }: {
-  open?: boolean;
+  open: boolean;
   onClose: () => void;
 }) {
   /* ── State ── */
@@ -975,6 +975,7 @@ export default function VoiceMode({
     busyRef.current = false;
     attachRecorder(streamRef.current);
     setState("listening");
+    setCaption("");
     startVadLoop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachRecorder]);
@@ -1133,27 +1134,22 @@ export default function VoiceMode({
     haptic(8);
 
     try {
-      /* ── 1) STT — Groq Whisper ile sesi anında yazıya çevir ── */
-      const GROQ_API_KEY = "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";
+      /* ── 1) STT — sesi yazıya çevir ── */
       const ac = new AbortController();
       abortRef.current = ac;
       const fd = new FormData();
       fd.append("file", blob, mime.includes("mp4") ? "voice.mp4" : "voice.webm");
-      fd.append("model", "whisper-large-v3-turbo");
       fd.append("language", "tr");
-
-      const sttR = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+      const sttR = await fetch(`${FN_BASE}/voice-stt`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-        },
+        headers: { Authorization: `Bearer ${ANON}`, apikey: ANON },
         body: fd,
         signal: ac.signal,
       });
       if (!sttR.ok) throw new Error(`stt-${sttR.status}`);
       const sttJ = await sttR.json();
       const userText = (sttJ.text || "").trim();
-      if (!userText || userText.length < 3) {
+      if (!userText || userText.length < 2) {
         restartRecording();
         return;
       }
@@ -1161,8 +1157,7 @@ export default function VoiceMode({
       await converse(userText);
     } catch (err) {
       if ((err as Error)?.name === "AbortError") return;
-      console.error("STT error:", err);
-      toast.error("Anlayamadım — lütfen tekrar konuşun");
+      toast.error("Bir sorun oldu — tekrar dinliyorum");
       restartRecording();
     }
   }
@@ -1182,36 +1177,27 @@ export default function VoiceMode({
     const ac = new AbortController();
     abortRef.current = ac;
 
-    /* ── 2) Chat — Groq API ile yıldırım hızında cevap üret ── */
-    const GROQ_API_KEY = "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";
-    const chatR = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    /* ── 2) Chat — cevap üret ── */
+    const chatR = await fetch(`${FN_BASE}/generate-site`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${GROQ_API_KEY}`,
+        Authorization: `Bearer ${ANON}`,
+        apikey: ANON,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          {
-            role: "system",
-            content: "Sen Mini Live sesli asistanısın. Türkçe, son derece doğal, canlı, samimi, kısa ve akıcı (1-2 cümle) cevaplar verirsin. KESİNLİKLE yıldız (*), tilde (~), markdown veya kod yazma!"
-          },
-          ...newHistory
-            .slice(0, -1)
-            .slice(-10)
-            .map((m) => ({ role: m.role, content: m.content })),
-          { role: "user", content: userText }
-        ],
-        max_tokens: 150,
-        temperature: 0.7,
+        prompt: userText + "\n\n" + VOICE_PERSONA,
+        history: newHistory
+          .slice(0, -1)
+          .slice(-12)
+          .map((m) => ({ role: m.role, content: m.content })),
       }),
       signal: ac.signal,
     });
-    if (!chatR.ok) throw new Error(`groq-${chatR.status}`);
+    if (!chatR.ok) throw new Error(`chat-${chatR.status}`);
     const chatJ = await chatR.json();
 
-    let reply = cleanForSpeech(chatJ.choices?.[0]?.message?.content || "");
+    let reply = cleanForSpeech(chatJ.text || "");
     if (!reply) reply = "Bunu tam anlayamadım, tekrar söyler misin?";
 
     setHistory((h) => [...h, { role: "assistant", content: reply, at: Date.now() }]);
@@ -1219,179 +1205,110 @@ export default function VoiceMode({
 
     /* ── 3) TTS — HD model + seçili ses + hız ── */
     setState("speaking");
-    
-    // ANDROID SES BUG'I ÇÖZÜMÜ: Mikrofon açıkken Android sesi ahizeye (telefonla konuşulan yere) verir.
-    // Sesi gürül gürül ana hoparlörden vermek için sesi çalmadan ÖNCE mikrofonu tamamen kapatıyoruz!
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close().catch(() => {});
-      audioCtxRef.current = null;
-    }
-
-    await speak(reply, () => {
-      setTimeout(() => {
-        if (!closedRef.current) startListening();
-      }, 600);
-    });
+    await speak(reply, () => restartRecording());
   }
 
-  function arrayBufferToBase64(buffer: ArrayBuffer): string {
-    let binary = "";
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
-
-  /** Bir metin parçasının TTS sesini indir, Base64 data URL döndür */
+  /** Bir metin parçasının TTS sesini indir, object URL döndür */
   async function fetchTtsUrl(text: string, signal: AbortSignal): Promise<string> {
-    try {
-      const ttsR = await fetch(`${FN_BASE}/voice-tts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${ANON}`,
-          apikey: ANON,
-        },
-        body: JSON.stringify({
-          text,
-          voice: voiceRef.current || "nova",
-          model: "tts-1",
-          speed: speedRef.current || 1.0,
-          response_format: "mp3",
-        }),
-        signal,
-      });
-      if (ttsR.ok) {
-        const buf = await ttsR.arrayBuffer();
-        if (buf.byteLength > 100) {
-          return "data:audio/mp3;base64," + arrayBufferToBase64(buf);
-        }
-      }
-    } catch {
-      /* Fallback to Google Translate MP3 URL below */
-    }
-    
-    // Google Translate TTS direct MP3 fallback (100% works everywhere)
-    const encoded = encodeURIComponent(text.slice(0, 190));
-    return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=tr&client=tw-ob`;
+    const ttsR = await fetch(`${FN_BASE}/voice-tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ANON}`,
+        apikey: ANON,
+      },
+      body: JSON.stringify({
+        text,
+        voice: voiceRef.current,
+        model: "tts-1", // hd yerine standart model — çok daha düşük gecikme
+        speed: speedRef.current,
+        response_format: "mp3",
+      }),
+      signal,
+    });
+    if (!ttsR.ok) throw new Error(`tts-${ttsR.status}`);
+    const buf = await ttsR.arrayBuffer();
+    return URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
   }
 
-  /** Bir Base64 / Audio URL'ini çal; bitince/hata olunca/iptal edilince resolve olur */
+  /** Bir object URL'i çal; bitince/hata olunca/iptal edilince resolve olur */
   function playUrl(url: string, signal: AbortSignal): Promise<void> {
     return new Promise((resolve) => {
-      const audio = new Audio();
-      audio.style.display = "none";
+      const audio = new Audio(url);
       audio.preload = "auto";
-      audio.src = url;
-      audio.volume = 1.0;
-      
-      // Android WebView GARANTİSİ: DOM'a eklemezsen bazı cihazlarda çalmaz!
-      document.body.appendChild(audio);
       playerRef.current = audio;
+
+      /* Küre, asistanın sesiyle senkron nefes alsın */
+      try {
+        const ctx = audioCtxRef.current;
+        if (ctx && ctx.state !== "closed") {
+          const elSrc = ctx.createMediaElementSource(audio);
+          const an = ctx.createAnalyser();
+          an.fftSize = 512;
+          an.smoothingTimeConstant = 0.5;
+          elSrc.connect(an);
+          an.connect(ctx.destination);
+          const buf = new Uint8Array(an.frequencyBinCount);
+          const pulse = () => {
+            if (playerRef.current !== audio || audio.paused || audio.ended) return;
+            an.getByteTimeDomainData(buf);
+            const rms = computeRms(buf);
+            smoothLevelRef.current =
+              smoothLevelRef.current * 0.72 + clamp(rms / 28, 0, 1) * 0.28;
+            setLevel(smoothLevelRef.current);
+            requestAnimationFrame(pulse);
+          };
+          audio.addEventListener("play", () => pulse(), { once: true });
+        }
+      } catch {
+        /* createMediaElementSource desteklenmiyorsa küre sadece nefes animasyonuyla kalır */
+      }
 
       let done = false;
       const finish = () => {
         if (done) return;
         done = true;
+        URL.revokeObjectURL(url);
         if (playerRef.current === audio) playerRef.current = null;
-        try { document.body.removeChild(audio); } catch {}
         signal.removeEventListener("abort", onAbort);
         resolve();
       };
-
       const onAbort = () => {
         try { audio.pause(); } catch { /* geç */ }
         finish();
       };
-
       signal.addEventListener("abort", onAbort);
       audio.onended = finish;
-      audio.onerror = (e) => {
-        console.warn("Audio element error:", e);
-        finish();
-      };
-
-      const timer = setTimeout(finish, 15000);
-
-      try {
-        audio.load();
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            haptic(6);
-          }).catch((err) => {
-            console.warn("Audio play blocked:", err);
-            clearTimeout(timer);
-            finish();
-          });
-        } else {
-          haptic(6);
-        }
-      } catch (err) {
-        console.warn("Audio catch:", err);
-        clearTimeout(timer);
-        finish();
-      }
+      audio.onerror = finish;
+      audio.play().then(() => haptic(6)).catch(finish);
     });
   }
 
-  function speakWithWebSpeech(text: string): Promise<void> {
-    return new Promise((resolve) => {
-      if (!("speechSynthesis" in window)) {
-        resolve();
-        return;
-      }
-      try {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = "tr-TR";
-        u.rate = speedRef.current || 1.0;
-        
-        const voices = window.speechSynthesis.getVoices();
-        const trVoice = voices.find(v => v.lang.includes("tr"));
-        if (trVoice) u.voice = trVoice;
-
-        let resolved = false;
-        const done = () => {
-          if (!resolved) {
-            resolved = true;
-            resolve();
-          }
-        };
-
-        u.onend = done;
-        u.onerror = done;
-        
-        setTimeout(done, Math.max(3000, text.length * 150));
-        window.speechSynthesis.speak(u);
-      } catch {
-        resolve();
-      }
-    });
-  }
-
+  /**
+   * Metni seslendir; bitince onDone çağrılır.
+   * HIZ: metin cümlelere bölünür, TÜM parçaların TTS'i aynı anda başlatılır —
+   * ilk cümle kısa olduğu için ses neredeyse anında başlar, kalan parçalar
+   * o çalarken arka planda iner ve peş peşe çalınır.
+   */
   async function speak(text: string, onDone: () => void) {
     const ac = new AbortController();
     abortRef.current = ac;
 
-    try {
-      const chunks = splitForTts(text);
-      for (const chunk of chunks) {
-        if (closedRef.current || ac.signal.aborted) return;
-        const url = await fetchTtsUrl(chunk, ac.signal);
-        if (closedRef.current || ac.signal.aborted) return;
+    const chunks = splitForTts(text);
+    /* Tüm parçaları paralel indir — sıra playback'te korunur */
+    const urlPromises = chunks.map((c) => fetchTtsUrl(c, ac.signal));
+
+    for (const p of urlPromises) {
+      if (closedRef.current || ac.signal.aborted) return;
+      try {
+        const url = await p;
+        if (closedRef.current || ac.signal.aborted) {
+          URL.revokeObjectURL(url);
+          return;
+        }
         await playUrl(url, ac.signal);
-      }
-    } catch (err) {
-      console.warn("speak error, fallback to WebSpeech:", err);
-      if (!closedRef.current && !ac.signal.aborted) {
-        await speakWithWebSpeech(text);
+      } catch {
+        /* tek parça hata verirse kalanlarla devam et */
       }
     }
 
@@ -1526,7 +1443,7 @@ export default function VoiceMode({
   const hasText = textInput.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden select-none vm-root" style={{ backgroundColor: "#faf7f5" }}>
+    <div className="fixed inset-0 z-[100] bg-white flex flex-col overflow-hidden select-none vm-root">
       {/* ── Global animasyon tanımları ── */}
       <style>{`
         .vm-root { animation: vmFade .35s ease; }
@@ -1565,7 +1482,7 @@ export default function VoiceMode({
             <LinesIcon className="w-[22px] h-[22px]" />
           </button>
           <div className="h-[46px] px-[22px] rounded-full bg-white shadow-[0_1px_10px_rgba(0,0,0,0.09)] flex items-center">
-            <span className="text-[15px] font-semibold text-stone-800 tracking-tight">Mini Live</span>
+            <span className="text-[15px] font-medium text-slate-900 tracking-tight">Live</span>
           </div>
         </div>
 
@@ -1635,8 +1552,8 @@ export default function VoiceMode({
                   void submitText();
                 }
               }}
-              placeholder="Mini'ye sor..."
-              aria-label="Mini'ye yazılı soru sor"
+              placeholder="ChatGPT'ye sor"
+              aria-label="ChatGPT'ye yazılı soru sor"
               className="flex-1 min-w-0 bg-transparent outline-none text-[16px] text-slate-900 placeholder:text-slate-400"
             />
             {hasText && (
