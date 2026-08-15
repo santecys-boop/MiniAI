@@ -13,19 +13,17 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger(), zipSourcePlugin()].filter(Boolean),
+  plugins: [react()].filter(Boolean),
+  optimizeDeps: {
+    include: ["lucide-react", "react", "react-dom", "react-router-dom"],
+  },
   build: {
+    target: "esnext",
     sourcemap: false,
     minify: "esbuild",
-    cssMinify: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ["react", "react-dom", "react-router-dom"],
-          ui: ["lucide-react", "@tanstack/react-query"],
-        },
-      },
-    },
+    cssMinify: "esbuild",
+    reportCompressedSize: false,
+    chunkSizeWarningLimit: 3000,
   },
   esbuild: {
     drop: mode === "production" ? ["console", "debugger"] : [],
