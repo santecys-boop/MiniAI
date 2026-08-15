@@ -77,7 +77,7 @@ export function ChatBottomBar({
   );
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-3 pb-3 pt-1 space-y-2">
+    <div className="w-full max-w-4xl mx-auto px-2.5 sm:px-4 pb-3 pt-1 space-y-2">
       {pendingAttachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-1">
           {pendingAttachments.map((a, i) => (

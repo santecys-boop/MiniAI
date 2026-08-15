@@ -245,6 +245,7 @@ export default function Index() {
   const [apiKeyLabel, setApiKeyLabel] = useState("");
   const [generatedApiKey, setGeneratedApiKey] = useState<string | null>(null);
   const [apiKeyBusy, setApiKeyBusy] = useState(false);
+  const [apiCodeLang, setApiCodeLang] = useState<"python" | "js" | "curl">("python");
   const [agentAlts, setAgentAlts] = useState<{ idx: number; text: string }[] | null>(null);
   const [agentCurrent, setAgentCurrent] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1480,7 +1481,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
           </main>
         )}
 
-        <aside className="flex flex-col overflow-hidden order-1" style={{ background: "transparent" }}>
+        <aside className="flex flex-col overflow-hidden order-1 w-full max-w-4xl mx-auto h-full" style={{ background: "transparent" }}>
           {code && (
             <div className="px-3 py-1.5 flex items-center justify-end">
               <Button variant="ghost" size="sm" className="h-7 rounded-full text-stone-600 hover:bg-stone-200/60" onClick={() => setPreviewOpen(o => !o)}>
@@ -1489,7 +1490,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
             </div>
           )}
 
-          <ScrollArea className="flex-1 p-4">
+          <ScrollArea className="flex-1 px-2.5 sm:px-4 py-2">
             <MessageList
               messages={messages}
               isLoading={busy}
@@ -1725,36 +1726,64 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
               </div>
             </ScrollArea>
 
-            {/* Koda Nasıl Eklenir? Gerçek API Key ile Entegrasyon */}
+            {/* Koda Nasıl Eklenir? Canlı Çoklu Dil Entegrasyonu */}
             <div className="border-t border-stone-200 pt-3 space-y-2">
-              <p className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-                <Code2 className="w-4 h-4 text-emerald-600" /> Koda Nasıl Eklenir? (Canlı Entegrasyon):
-              </p>
-              <div className="relative rounded-xl border border-stone-800 bg-stone-950 p-3 text-[11px] font-mono text-stone-200 overflow-auto max-h-36">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const codeText = `// JavaScript / Node.js Entegrasyonu\nconst res = await fetch("https://radiant-liger-e14789.netlify.app/api/generate", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${generatedApiKey || (apiKeys[0]?.key_prefix ? apiKeys[0].key_prefix + '...' : 'mini_xxxxxxxxxxxxxxxx')}",\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({ prompt: "Portfolyo web sitesi", type: "html" })\n});\nconst data = await res.json();\nconsole.log(data);`;
-                    navigator.clipboard.writeText(codeText);
-                    toast.success("Entegrasyon kodu panoya kopyalandı!");
-                  }}
-                  className="absolute top-2 right-2 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[10px] text-stone-300 font-sans"
-                >
-                  Kopyala
-                </button>
-                <pre className="leading-snug">
-{`// JavaScript / Node.js
-const res = await fetch("https://radiant-liger-e14789.netlify.app/api/generate", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer ${generatedApiKey || (apiKeys[0]?.key_prefix ? apiKeys[0].key_prefix + '...' : 'mini_xxxxxxxxxxxxxxxx')}",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({ prompt: "Portfolyo sitesi", type: "html" })
-});
-const data = await res.json();`}
-                </pre>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                  <Code2 className="w-4 h-4 text-emerald-600" /> Koda Nasıl Eklenir?
+                </p>
+                <div className="flex items-center gap-1 bg-stone-200/80 p-0.5 rounded-lg text-[11px] font-sans">
+                  <button
+                    type="button"
+                    onClick={() => setApiCodeLang("python")}
+                    className={`px-2 py-0.5 rounded-md font-bold transition ${apiCodeLang === "python" ? "bg-stone-900 text-white shadow-xs" : "text-stone-600 hover:text-stone-900"}`}
+                  >
+                    Python
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApiCodeLang("js")}
+                    className={`px-2 py-0.5 rounded-md font-bold transition ${apiCodeLang === "js" ? "bg-stone-900 text-white shadow-xs" : "text-stone-600 hover:text-stone-900"}`}
+                  >
+                    JavaScript
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApiCodeLang("curl")}
+                    className={`px-2 py-0.5 rounded-md font-bold transition ${apiCodeLang === "curl" ? "bg-stone-900 text-white shadow-xs" : "text-stone-600 hover:text-stone-900"}`}
+                  >
+                    cURL
+                  </button>
+                </div>
               </div>
+
+              {(() => {
+                const currentKey = generatedApiKey || (apiKeys[0]?.key_prefix ? apiKeys[0].key_prefix + '...' : 'mini_xxxxxxxxxxxxxxxx');
+                
+                const pythonCode = `import requests\n\nAPI_KEY = "${currentKey}"\nurl = "https://radiant-liger-e14789.netlify.app/api/generate"\n\nheaders = {\n    "Authorization": f"Bearer {API_KEY}",\n    "Content-Type": "application/json"\n}\n\ndata = {\n    "prompt": "Modern portfolyo web sitesi",\n    "type": "html"\n}\n\nresponse = requests.post(url, headers=headers, json=data)\nprint(response.json())`;
+
+                const jsCode = `// JavaScript / Node.js\nconst API_KEY = "${currentKey}";\n\nconst res = await fetch("https://radiant-liger-e14789.netlify.app/api/generate", {\n  method: "POST",\n  headers: {\n    "Authorization": \`Bearer \${API_KEY}\`,\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({\n    prompt: "Modern portfolyo web sitesi",\n    type: "html"\n  })\n});\n\nconst data = await res.json();\nconsole.log(data);`;
+
+                const curlCode = `curl -X POST https://radiant-liger-e14789.netlify.app/api/generate \\\n  -H "Authorization: Bearer ${currentKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "Modern portfolyo", "type": "html"}'`;
+
+                const activeCode = apiCodeLang === "python" ? pythonCode : apiCodeLang === "js" ? jsCode : curlCode;
+
+                return (
+                  <div className="relative rounded-xl border border-stone-800 bg-stone-950 p-3 text-[11px] font-mono text-stone-200 overflow-auto max-h-40 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(activeCode);
+                        toast.success(`${apiCodeLang.toUpperCase()} entegrasyon kodu panoya kopyalandı!`);
+                      }}
+                      className="absolute top-2 right-2 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[10px] text-stone-300 font-sans font-medium"
+                    >
+                      Kodu Kopyala
+                    </button>
+                    <pre className="leading-relaxed whitespace-pre-wrap">{activeCode}</pre>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </DialogContent>
