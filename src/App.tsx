@@ -13,6 +13,8 @@ import Auth from "./pages/Auth.tsx";
 import Admin from "./pages/Admin.tsx";
 import PublishedSite from "./pages/PublishedSite.tsx";
 import ApiDocs from "./pages/ApiDocs.tsx";
+import CodeApi from "./pages/CodeApi.tsx";
+import VoicePage from "./pages/VoicePage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -54,7 +56,9 @@ const App = () => {
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/site/:id" element={<PublishedSite />} />
-          <Route path="/api-docs" element={<ApiDocs />} />
+          <Route path="/api-docs" element={<CodeApi />} />
+          <Route path="/codeapi" element={<CodeApi />} />
+          <Route path="/voice" element={<VoicePage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

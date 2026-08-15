@@ -127,24 +127,17 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
       {/* Message Content (Thinking + Text) */}
       <div className="flex-1 space-y-3 min-w-0">
         
-        {/* ThinkingReasoning (En üstte) */}
-        {m.effort && m.effort !== "Low" && (
-          <div className="mb-1">
-            <ThinkingReasoning effort={m.effort} sentences={planSentences} />
-          </div>
-        )}
-
-        {/* DeepSeek Tarzı Düşünce Akışı (Collapsible Think Box) */}
+        {/* DeepSeek R1 Tarzı Gerçek Düşünce Akışı */}
         {thoughtContent && (
-          <details className="mb-2 rounded-2xl border border-stone-800 bg-stone-900/60 p-3 text-xs group" open={false}>
-            <summary className="cursor-pointer select-none flex items-center justify-between text-stone-400 hover:text-stone-200 font-medium">
+          <details className="mb-3 rounded-2xl border border-stone-800 bg-stone-900/70 p-3 text-xs group" open={false}>
+            <summary className="cursor-pointer select-none flex items-center justify-between text-stone-400 hover:text-stone-200 transition font-medium">
               <span className="flex items-center gap-2">
-                <Sparkle className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                <span className="font-semibold text-stone-300">Düşünce Süreci (Thinking)</span>
+                <span className="w-2 h-2 rounded-full bg-amber-400/80" />
+                <span className="font-semibold text-stone-200">Düşünce Süreci (Thinking)</span>
               </span>
-              <span className="text-[10px] text-stone-500 group-open:rotate-90 transition-transform">▶</span>
+              <span className="text-[11px] text-stone-500 group-open:rotate-90 transition-transform">▶</span>
             </summary>
-            <div className="mt-2.5 pt-2 border-t border-stone-800/80 text-stone-400 font-mono text-[11px] leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-amber-500/40">
+            <div className="mt-2.5 pt-2.5 border-t border-stone-800 text-stone-400 font-mono text-[12px] leading-relaxed whitespace-pre-wrap pl-2.5 border-l-2 border-amber-500/40">
               {thoughtContent}
             </div>
           </details>

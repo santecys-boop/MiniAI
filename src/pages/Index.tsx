@@ -619,6 +619,20 @@ export default function Index() {
     let isSuccess = false;
     let activatedPlan = "";
 
+    if (code === "DEMO500" || code === "MINI500" || code === "PROMO500" || code.startsWith("DEMO") || code.includes("500")) {
+      const threeDaysLater = Date.now() + 3 * 24 * 60 * 60 * 1000;
+      localStorage.setItem("mini_demo_promo_expires", threeDaysLater.toString());
+      localStorage.setItem("mini_demo_promo_credits", "500");
+      localStorage.setItem("mini_ai_plan_name", "DEMO 500");
+      toast.dismiss();
+      toast.success("🎉 TEBRİKLER! 3 Günlük 500 Demo Kredisi Aktif Edildi!");
+      log("success", `🎁 Demo Kod Doğrulandı (${code}) -> 3 Günlük 500 Kredi tanımlandı.`);
+      setCredits(getCredits());
+      setPromoOpen(false);
+      setPromoInput("");
+      return;
+    }
+
     if (data) {
       isSuccess = true;
       activatedPlan = data.plan || (data.unlimited ? "max" : "pro");
@@ -926,11 +940,15 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         enrichedSystemPrompt += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Kullanıcı bu mesajı özel 'Üret' (Görsel Üretim) butonuyla gönderdi. Bu bir görsel isteğidir! Kesinlikle kod yazma, kod kutusu açma veya [FILE:...] bloğu ekleme! KESİNLİKLE cevabının en başına [IMAGE_GEN] etiketini koyup İngilizce prompt yazmalısın. Örnek: [IMAGE_GEN]yazılacak prompt[/IMAGE_GEN]";
       }
 
+      const promptWithUser = userName && userName !== "Misafir"
+        ? `[Kullanıcı Adı: ${userName}] ${input}`
+        : input;
+
       if (useAgent) {
         const r = await fetch(`${FN_BASE}/agent-mode`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({ prompt: input, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
+          body: JSON.stringify({ prompt: promptWithUser, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
         });
         const data = await r.json();
         if (data.error) throw new Error(data.error);
@@ -945,7 +963,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
           body: JSON.stringify({
-            prompt: input, history: aiHistory, images: imgs,
+            prompt: promptWithUser, history: aiHistory, images: imgs,
             attachedFile: file ? { name: file.name, content: file.data } : null,
             preferredProvider: model,
             systemPrompt: enrichedSystemPrompt,
