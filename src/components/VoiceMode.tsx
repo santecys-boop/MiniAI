@@ -842,15 +842,21 @@ function TranscriptSheet({
 export default function VoiceMode({
   open,
   onClose,
+  userName,
+  initialHistory = [],
+  onMessageAdded,
 }: {
   open: boolean;
   onClose: () => void;
+  userName?: string;
+  initialHistory?: Msg[];
+  onMessageAdded?: (msg: { role: "user" | "assistant"; content: string }) => void;
 }) {
   /* ── State ── */
   const [state, setState] = useState<VoiceState>("idle");
   const [caption, setCaption] = useState("");
   const [level, setLevel] = useState(0);
-  const [history, setHistory] = useState<Msg[]>([]);
+  const [history, setHistory] = useState<Msg[]>(initialHistory);
   const [textInput, setTextInput] = useState("");
   const [showVoices, setShowVoices] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -1168,6 +1174,8 @@ export default function VoiceMode({
     setCaption(userText);
     setState("thinking");
 
+    onMessageAdded?.({ role: "user", content: userText });
+
     const newHistory: Msg[] = [
       ...historyRef.current,
       { role: "user", content: userText, at: Date.now() },
@@ -1176,6 +1184,8 @@ export default function VoiceMode({
 
     const ac = new AbortController();
     abortRef.current = ac;
+
+    const userPrefix = userName ? `(Kullanıcının ismi: ${userName}. Onu tanıyorsun, geçmişi biliyorsun ve ona ismiyle samimi şekilde hitap edebilirsin.)\n\n` : "";
 
     /* ── 2) Chat — cevap üret ── */
     const chatR = await fetch(`${FN_BASE}/generate-site`, {
@@ -1186,7 +1196,7 @@ export default function VoiceMode({
         apikey: ANON,
       },
       body: JSON.stringify({
-        prompt: userText + "\n\n" + VOICE_PERSONA,
+        prompt: userPrefix + userText + "\n\n" + VOICE_PERSONA,
         history: newHistory
           .slice(0, -1)
           .slice(-12)
@@ -1202,6 +1212,7 @@ export default function VoiceMode({
 
     setHistory((h) => [...h, { role: "assistant", content: reply, at: Date.now() }]);
     setCaption(reply);
+    onMessageAdded?.({ role: "assistant", content: reply });
 
     /* ── 3) TTS — HD model + seçili ses + hız ── */
     setState("speaking");
@@ -1552,8 +1563,8 @@ export default function VoiceMode({
                   void submitText();
                 }
               }}
-              placeholder="ChatGPT'ye sor"
-              aria-label="ChatGPT'ye yazılı soru sor"
+              placeholder="Mini'ye sor..."
+              aria-label="Mini AI'ye yazılı soru sor"
               className="flex-1 min-w-0 bg-transparent outline-none text-[16px] text-slate-900 placeholder:text-slate-400"
             />
             {hasText && (

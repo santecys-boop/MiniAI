@@ -211,9 +211,12 @@ const ANON = import.meta.env.VITE_AI_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUz
 
 export default function Index() {
   const { user, logout } = useAuth();
+  const [isGuest, setIsGuest] = useState(() => localStorage.getItem("mini_ai_guest_mode") === "1");
   const [welcomeDisclaimerOpen, setWelcomeDisclaimerOpen] = useState(() => {
     return !sessionStorage.getItem("mini_ai_disclaimer_seen");
   });
+  const [featuresGuideOpen, setFeaturesGuideOpen] = useState(false);
+  const [authGateOpen, setAuthGateOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState("sambanova");
@@ -249,9 +252,6 @@ export default function Index() {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const [onboardOpen, setOnboardOpen] = useState(false);
-  const [onboardStep, setOnboardStep] = useState(0);
-  const [onboard, setOnboard] = useState<OnboardAnswers>({ name: "", goal: "", style: "" });
   const [smartEdit, setSmartEdit] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -400,18 +400,13 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    if (!localStorage.getItem(ONBOARDING_KEY)) {
-      setOnboardOpen(true);
+    const seen = sessionStorage.getItem("mini_ai_disclaimer_seen");
+    const guest = localStorage.getItem("mini_ai_guest_mode") === "1";
+    const googleUser = localStorage.getItem("mini_ai_google_user");
+    if (seen && !guest && !googleUser && !user) {
+      setAuthGateOpen(true);
     }
-  }, []);
-  useEffect(() => { if (apiKeysOpen) loadApiKeys(); }, [apiKeysOpen, user]);
-
-  function finishOnboarding() {
-    localStorage.setItem(ONBOARDING_KEY, JSON.stringify(onboard));
-    setOnboardOpen(false);
-    if (onboard.goal) setInput(onboard.goal);
-    toast.success(`Hoş geldin${onboard.name ? ", " + onboard.name : ""}! 🚀`);
-  }
+  }, [user]);
 
   const getUserStorageKey = () => {
     if (user?.id) return `mini_ai_sites_user_${user.id}`;
@@ -854,9 +849,9 @@ export default function Index() {
       if (!isUnlimited()) {
         const remaining = getDailyRemaining();
         if (remaining <= 0) {
-          toast.error("⚠️ Günlük 20 ücretsiz krediniz bitti! Yarın sıfırlanacak veya PRO/MAX plana geçin.");
+          toast.error("⚠️ Günlük 35 ücretsiz krediniz bitti! Yarın sıfırlanacak veya PRO/MAX plana geçin.");
           setPricingOpen(true);
-          log("error", "🛑 Günlük kredi limiti (20/20) aşıldı.");
+          log("error", "🛑 Günlük kredi limiti (35/35) aşıldı.");
           return;
         }
       }
@@ -1673,138 +1668,20 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
-      {voiceOpen && <VoiceMode open={true} onClose={() => setVoiceOpen(false)} />}
+      {voiceOpen && (
+        <VoiceMode
+          open={true}
+          onClose={() => setVoiceOpen(false)}
+          userName={user?.name || user?.user_metadata?.full_name || (isGuest ? "Misafir" : undefined)}
+          initialHistory={messages.filter(m => m.chat).map(m => ({ role: m.role, content: m.chat || "", at: Date.now() }))}
+          onMessageAdded={(msg) => {
+            setMessages(prev => [...prev, { role: msg.role, chat: msg.content }]);
+            log(msg.role === "user" ? "info" : "ai", `🎤 [Sesli Sohbet] ${msg.role === "user" ? "Kullanıcı" : "Mini AI"}: ${msg.content.slice(0, 60)}...`);
+          }}
+        />
+      )}
 
-      <Dialog open={onboardOpen} onOpenChange={setOnboardOpen}>
-        <DialogContent className="rounded-2xl max-w-sm" style={{ backgroundColor: "#faf7f5" }}>
-          <DialogHeader>
-            <DialogTitle>
-              {onboardStep === 0 ? "Mini AI'ye hoş geldin 👋" : onboardStep === 1 ? "Ne yapmak istiyorsun?" : "Nasıl bir stil tercih edersin?"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {onboardStep === 0 && (
-              <>
-                <p className="text-sm text-stone-500">Sana nasıl hitap edeyim?</p>
-                <Input value={onboard.name} onChange={e => setOnboard(o => ({ ...o, name: e.target.value }))} placeholder="Adın (opsiyonel)" className="rounded-xl border-stone-200" />
-              </>
-            )}
-            {onboardStep === 1 && (
-              <>
-                <p className="text-sm text-stone-500">Mini AI'den ilk ne yapmamı istersin?</p>
-                <Textarea value={onboard.goal} onChange={e => setOnboard(o => ({ ...o, goal: e.target.value }))} placeholder="Örn: Portfolyo sitesi yap, kod düzelt, araştır..." className="rounded-xl border-stone-200 resize-none min-h-[80px]" />
-              </>
-            )}
-            {onboardStep === 2 && (
-              <>
-                <p className="text-sm text-stone-500">Tercih ettiğin stil nedir?</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {["Minimal", "Renkli", "Profesyonel"].map(s => (
-                    <button key={s} onClick={() => setOnboard(o => ({ ...o, style: s }))}
-                      className={`rounded-xl py-2.5 text-sm border transition ${onboard.style === s ? "bg-stone-900 text-white border-stone-900" : "bg-white border-stone-200 text-stone-700 hover:border-stone-400"}`}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-            <div className="flex gap-2 justify-end">
-              {onboardStep > 0 && (
-                <Button variant="ghost" className="rounded-xl" onClick={() => setOnboardStep(s => s - 1)}>Geri</Button>
-              )}
-              {onboardStep < 2 ? (
-                <Button className="rounded-xl bg-stone-900 text-white hover:bg-stone-800" onClick={() => setOnboardStep(s => s + 1)}>İleri</Button>
-              ) : (
-                <Button className="rounded-xl bg-stone-900 text-white hover:bg-stone-800" onClick={finishOnboarding}>Başla</Button>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={smsOpen} onOpenChange={setSmsOpen}>
-        <DialogContent className="rounded-2xl max-w-sm" style={{ backgroundColor: "#faf7f5" }}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-stone-900 font-bold">
-              <Smartphone className="w-5 h-5 text-emerald-600" />
-              {smsStep === "phone" ? "SMS ile Giriş Yap" : "SMS Kodu Doğrulama"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {smsStep === "phone" ? (
-              <>
-                <p className="text-xs text-stone-500">
-                  Telefon numaranızı girin. Size 6 haneli tek kullanımlık SMS doğrulama kodu göndereceğiz.
-                </p>
-                <div className="space-y-2">
-                  <Input
-                    type="tel"
-                    value={phoneInput}
-                    onChange={e => setPhoneInput(e.target.value)}
-                    placeholder="5xx xxx xx xx"
-                    className="rounded-xl border-stone-200 font-mono text-sm"
-                    onKeyDown={async e => {
-                      if (e.key === "Enter" && phoneInput.trim()) {
-                        const ok = await handleSendSmsOtp(phoneInput);
-                        if (ok) setSmsStep("otp");
-                      }
-                    }}
-                  />
-                </div>
-                <Button
-                  className="w-full rounded-xl bg-stone-900 text-white hover:bg-stone-800 h-10 text-xs font-bold"
-                  onClick={async () => {
-                    if (!phoneInput.trim()) { toast.error("Lütfen telefon numaranızı girin."); return; }
-                    const ok = await handleSendSmsOtp(phoneInput);
-                    if (ok) setSmsStep("otp");
-                  }}
-                >
-                  SMS Kodu Gönder 📲
-                </Button>
-              </>
-            ) : (
-              <>
-                <p className="text-xs text-stone-500">
-                  <b className="text-stone-800">{phoneInput}</b> numarasına gönderilen 6 haneli doğrulama kodunu girin:
-                </p>
-                <div className="space-y-2">
-                  <Input
-                    type="text"
-                    maxLength={6}
-                    value={otpInput}
-                    onChange={e => setOtpInput(e.target.value)}
-                    placeholder="123456"
-                    className="rounded-xl border-stone-200 font-mono text-center text-lg tracking-widest"
-                    onKeyDown={async e => {
-                      if (e.key === "Enter" && otpInput.trim().length === 6) {
-                        const ok = await handleVerifySmsOtp(phoneInput, otpInput);
-                        if (ok) { setSmsOpen(false); setOtpInput(""); setPhoneInput(""); }
-                      }
-                    }}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" className="rounded-xl flex-1 text-xs" onClick={() => setSmsStep("phone")}>
-                    Geri
-                  </Button>
-                  <Button
-                    className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex-1 h-10 text-xs font-bold"
-                    onClick={async () => {
-                      if (otpInput.trim().length !== 6) { toast.error("Lütfen 6 haneli doğrulama kodunu girin."); return; }
-                      const ok = await handleVerifySmsOtp(phoneInput, otpInput);
-                      if (ok) { setSmsOpen(false); setOtpInput(""); setPhoneInput(""); }
-                    }}
-                  >
-                    Kodu Doğrula & Giriş Yap ✅
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Açılış Bilgilendirme Kartı */}
+      {/* 1. Aşama: Açılış Bilgilendirme Kartı */}
       <Dialog open={welcomeDisclaimerOpen} onOpenChange={setWelcomeDisclaimerOpen}>
         <DialogContent className="max-w-md bg-stone-900/95 border border-stone-800 text-stone-100 backdrop-blur-xl shadow-2xl rounded-2xl p-6">
           <DialogHeader>
@@ -1823,11 +1700,138 @@ export default function Index() {
               onClick={() => {
                 sessionStorage.setItem("mini_ai_disclaimer_seen", "1");
                 setWelcomeDisclaimerOpen(false);
+                setFeaturesGuideOpen(true);
               }}
               className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs rounded-xl px-5 py-2"
             >
               Anladım, Devam Et
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 2. Aşama: LÜTFEN OKU Rehberi */}
+      <Dialog open={featuresGuideOpen} onOpenChange={setFeaturesGuideOpen}>
+        <DialogContent className="max-w-lg bg-stone-950/95 border border-stone-800 text-stone-100 backdrop-blur-2xl shadow-2xl rounded-2xl p-6">
+          <div className="text-center pb-2 border-b border-stone-800">
+            <span className="inline-block px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 text-[11px] font-black tracking-widest uppercase mb-1">
+              ÖNEMLİ BİLGİLENDİRME
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+              LÜTFEN OKU 📢
+            </h2>
+            <p className="text-xs text-stone-400 mt-1">Mini AI Neler Yapabilir & Nasıl Kullanılır?</p>
+          </div>
+
+          <ScrollArea className="max-h-[55vh] pr-2 my-4">
+            <div className="space-y-3 text-xs text-stone-300">
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-900/60 border border-stone-800/80">
+                <Globe2 className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white text-sm">🌐 Canlı Web Siteleri & Web Uygulamaları</h4>
+                  <p className="text-stone-400 mt-0.5">Tek bir cümleyle interaktif, tam çalışan web siteleri, oyunlar, hesaplayıcılar ve paneller kodlar ve anında canlı önizleme sunar.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-900/60 border border-stone-800/80">
+                <Code className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white text-sm">💻 Akıllı Kodlama & Otomatik Hata Düzeltme</h4>
+                  <p className="text-stone-400 mt-0.5">HTML, React, Python, JavaScript gibi tüm dillerde projeler geliştirir, hataları tespit edip kendiliğinden onarır.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-900/60 border border-stone-800/80">
+                <Sparkles className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white text-sm">🎨 Yapay Zeka Görsel Üretimi</h4>
+                  <p className="text-stone-400 mt-0.5">Hayalindeki manzaraları, logoları, çizimleri anında üretir ve web projelerinin içine yerleştirir.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-900/60 border border-stone-800/80">
+                <Volume2 className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white text-sm">🎙️ Sesli Canlı Sohbet (Voice Mode)</h4>
+                  <p className="text-stone-400 mt-0.5">Gerçekçi Türkçe ses motoruyla dilediğin gibi konuş, soru sor, fikir danış ve anında sesli yanıtlar al.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-900/60 border border-stone-800/80">
+                <Download className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white text-sm">📦 ZIP & APK Olarak İndirme</h4>
+                  <p className="text-stone-400 mt-0.5">Oluşturduğun tüm siteleri ve projeleri tek tıkla ZIP veya Android APK olarak cihazına indirebilirsin.</p>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+
+          <div className="pt-2 flex justify-end">
+            <Button
+              onClick={() => {
+                setFeaturesGuideOpen(false);
+                const guest = localStorage.getItem("mini_ai_guest_mode") === "1";
+                const googleUser = localStorage.getItem("mini_ai_google_user");
+                if (!user && !guest && !googleUser) {
+                  setAuthGateOpen(true);
+                }
+              }}
+              className="w-full sm:w-auto bg-white hover:bg-stone-200 text-stone-900 font-bold text-xs rounded-xl px-6 py-2.5 shadow-lg"
+            >
+              Başla ve Keşfet 🚀
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 3. Aşama: Giriş Yap veya Misafir Modu Kapısı (Zorunlu) */}
+      <Dialog open={authGateOpen} onOpenChange={(val) => {
+        const guest = localStorage.getItem("mini_ai_guest_mode") === "1";
+        const googleUser = localStorage.getItem("mini_ai_google_user");
+        if (user || guest || googleUser) setAuthGateOpen(val);
+      }}>
+        <DialogContent className="max-w-md bg-stone-950/95 border border-stone-800 text-stone-100 backdrop-blur-2xl shadow-2xl rounded-2xl p-6 [&>button]:hidden">
+          <div className="text-center pb-2">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <h3 className="text-xl font-bold text-white">Mini AI'ye Hoş Geldin</h3>
+            <p className="text-xs text-stone-400 mt-1">
+              Devam edebilmek için Google ile oturum açın veya Misafir Modu ile başlayın.
+            </p>
+          </div>
+
+          <div className="space-y-3 pt-4">
+            <button
+              onClick={handleGoogleLogin}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white hover:bg-stone-100 text-stone-900 font-semibold text-sm shadow-md transition active:scale-[0.98]"
+            >
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+              </svg>
+              <span>Google ile Giriş Yap</span>
+            </button>
+
+            <div className="relative flex items-center justify-center my-2">
+              <div className="border-t border-stone-800 w-full" />
+              <span className="bg-stone-950 px-2 text-[10px] uppercase tracking-wider text-stone-500 font-bold">veya</span>
+            </div>
+
+            <button
+              onClick={() => {
+                localStorage.setItem("mini_ai_guest_mode", "1");
+                setIsGuest(true);
+                setAuthGateOpen(false);
+                toast.success("Misafir modu aktif! Hoş geldin.");
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-200 border border-stone-800 font-medium text-xs transition active:scale-[0.98]"
+            >
+              <span>Misafir Modu ile Devam Et</span>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
