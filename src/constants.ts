@@ -7,10 +7,10 @@ export const ONLINE_COMPILER_API_KEY = "54a81b482603efeb0fdbf7ce5784e330";
 export const ADMIN_HASH = "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
 
 export const MODEL_OPTIONS = [
+  { v: "siliconflow", label: "SiliconFlow (GLM / DeepSeek / Kimi)" },
+  { v: "llm7", label: "LLM7.io Engine" },
   { v: "sambanova", label: "Mini-Pro 3" },
-  { v: "lovable", label: "Mini-Flash 2" },
   { v: "gemini", label: "Mini-Vision 1" },
-  { v: "openrouter", label: "Mini-Coder X" },
 ];
 
 export const ONBOARDING_KEY = "mini_onboarded_v1";

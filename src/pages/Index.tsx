@@ -44,6 +44,7 @@ import UserProfilePopover from "../components/UserProfilePopover";
 import { ProjectFileTree } from "../components/ProjectFileTree";
 import { DatabaseSchemaViewer } from "../components/DatabaseSchemaViewer";
 import { MultiFileSandboxPreview } from "../components/MultiFileSandboxPreview";
+import { executeMultiProviderChat, AIMessage } from "../services/aiProviderService";
 
 const GOOGLE_CLIENT_ID = "930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.googleusercontent.com";
 
@@ -977,21 +978,58 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         setAgentAlts(data.candidates);
         setAgentCurrent(data.winner - 1);
       } else {
-        const resp = await fetch(`${FN_BASE}/generate-site`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({
-            prompt: promptToSend, history: aiHistory, images: imgs,
-            attachedFile: file ? { name: file.name, content: file.data } : null,
-            preferredProvider: model,
-            systemPrompt: enrichedSystemPrompt,
-            onlineCompilerKey: ONLINE_COMPILER_API_KEY,
-            ...(isFix ? { fixError: input, currentCode: code } : {}),
-          }),
-        });
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error);
-        parsed = parseAIResponse(data.text, textFiles[0]?.name);
+        let aiTextResponse = "";
+
+        // Doğrudan Çoklu Anahtarlı Yüksek Hızlı Motor (SiliconFlow 4 Key + LLM7 4 Key)
+        try {
+          const chatMsgs: AIMessage[] = [
+            { role: "system", content: enrichedSystemPrompt },
+            ...aiHistory.map((h: any) => ({ role: h.role as "user" | "assistant", content: typeof h.content === "string" ? h.content : JSON.stringify(h.content) })),
+            { role: "user", content: promptToSend }
+          ];
+
+          const providerResult = await executeMultiProviderChat(
+            chatMsgs,
+            model === "llm7" ? "llm7" : "siliconflow"
+          );
+
+          if (providerResult.text) {
+            aiTextResponse = providerResult.text;
+            if (providerResult.keyIndex > 0) {
+              log("ai", `⚡ Model yanıt verdi [${providerResult.provider.toUpperCase()}]: Key #${providerResult.keyIndex}`);
+            }
+          }
+        } catch (directErr) {
+          console.warn("Direct multi-provider error, trying fallback...", directErr);
+        }
+
+        // Eğer doğrudan çağrı başarısız olduysa backend'den dene
+        if (!aiTextResponse || aiTextResponse === "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.") {
+          try {
+            const resp = await fetch(`${FN_BASE}/generate-site`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
+              body: JSON.stringify({
+                prompt: promptToSend, history: aiHistory, images: imgs,
+                attachedFile: file ? { name: file.name, content: file.data } : null,
+                preferredProvider: model,
+                systemPrompt: enrichedSystemPrompt,
+                onlineCompilerKey: ONLINE_COMPILER_API_KEY,
+                ...(isFix ? { fixError: input, currentCode: code } : {}),
+              }),
+            });
+            const data = await resp.json();
+            if (data.text) aiTextResponse = data.text;
+          } catch (fbErr) {
+            console.error("Fallback failed", fbErr);
+          }
+        }
+
+        if (!aiTextResponse) {
+          aiTextResponse = "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.";
+        }
+
+        parsed = parseAIResponse(aiTextResponse, textFiles[0]?.name);
         setAgentAlts(null);
       }
       const projApiKey = generateProjectApiKey();
