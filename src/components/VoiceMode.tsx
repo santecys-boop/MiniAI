@@ -1113,6 +1113,24 @@ export default function VoiceMode({
           wakeLockRef.current = await nav.wakeLock.request("screen");
         }
       } catch { /* geç */ }
+
+      /* Medya Bildirimi (MediaSession) & Arka Planda Ses Çalma */
+      try {
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: "Mini AI — Sesli Canlı Sohbet",
+            artist: "Mini AI Asistan",
+            album: "Live Voice Mode",
+            artwork: [
+              { src: "/favicon.ico", sizes: "96x96", type: "image/x-icon" }
+            ]
+          });
+          navigator.mediaSession.playbackState = "playing";
+          navigator.mediaSession.setActionHandler("play", () => { playerRef.current?.play(); });
+          navigator.mediaSession.setActionHandler("pause", () => { playerRef.current?.pause(); });
+          navigator.mediaSession.setActionHandler("stop", () => { onClose(); });
+        }
+      } catch { /* pass */ }
     } catch {
       toast.error("Mikrofon açılamadı — izin verildiğinden emin ol");
       onClose();

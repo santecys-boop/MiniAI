@@ -70,10 +70,14 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
     return () => clearInterval(timer);
   }, [showCompile, m.code]);
 
-  const isGeneratingImg = m.chat ? (m.chat.includes("tasarlanıyor") || m.chat.includes("oluşturuluyor") || m.chat.includes("görseliniz")) && !m.chat.includes("![") : false;
-  const mdImageMatch = m.chat ? m.chat.match(/!\[.*?\]\((.*?)\)/) : null;
+  const thinkMatch = m.chat ? m.chat.match(/<think>([\s\S]*?)<\/think>/i) : null;
+  const thoughtContent = thinkMatch ? thinkMatch[1].trim() : null;
+  const rawChatWithoutThink = m.chat ? m.chat.replace(/<think>[\s\S]*?<\/think>/i, "").trim() : "";
+
+  const isGeneratingImg = rawChatWithoutThink ? (rawChatWithoutThink.includes("tasarlanıyor") || rawChatWithoutThink.includes("oluşturuluyor") || rawChatWithoutThink.includes("görseliniz")) && !rawChatWithoutThink.includes("![") : false;
+  const mdImageMatch = rawChatWithoutThink ? rawChatWithoutThink.match(/!\[.*?\]\((.*?)\)/) : null;
   const imageUrl = mdImageMatch ? mdImageMatch[1] : m.attachments?.find(a => a.kind === "image")?.data;
-  const cleanChatText = m.chat ? m.chat.replace(/!\[.*?\]\(.*?\)/g, "").trim() : "";
+  const cleanChatText = rawChatWithoutThink ? rawChatWithoutThink.replace(/!\[.*?\]\(.*?\)/g, "").trim() : "";
 
   if (m.role === "user") {
     return (
@@ -130,6 +134,22 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
           </div>
         )}
 
+        {/* DeepSeek Tarzı Düşünce Akışı (Collapsible Think Box) */}
+        {thoughtContent && (
+          <details className="mb-2 rounded-2xl border border-stone-800 bg-stone-900/60 p-3 text-xs group" open={false}>
+            <summary className="cursor-pointer select-none flex items-center justify-between text-stone-400 hover:text-stone-200 font-medium">
+              <span className="flex items-center gap-2">
+                <Sparkle className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <span className="font-semibold text-stone-300">Düşünce Süreci (Thinking)</span>
+              </span>
+              <span className="text-[10px] text-stone-500 group-open:rotate-90 transition-transform">▶</span>
+            </summary>
+            <div className="mt-2.5 pt-2 border-t border-stone-800/80 text-stone-400 font-mono text-[11px] leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-amber-500/40">
+              {thoughtContent}
+            </div>
+          </details>
+        )}
+
         <div className="text-sm font-sans space-y-3">
         {m.attachments && m.attachments.length > 0 && !imageUrl && (
           <div className="flex flex-wrap gap-1.5">
@@ -145,7 +165,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
           <div className="space-y-3 my-2 animate-fade-in">
             <div className="flex items-center gap-2 text-stone-800 dark:text-stone-200 font-medium text-sm">
               <span className="text-base">✨</span>
-              <span>{m.chat.replace(/\*\*/g, "").replace(/^✨\s*/, "")}</span>
+              <span>{cleanChatText.replace(/\*\*/g, "").replace(/^✨\s*/, "")}</span>
             </div>
             <div className="w-full max-w-sm aspect-[4/3] rounded-3xl bg-neutral-200/90 dark:bg-neutral-800/90 animate-pulse border border-neutral-300/40 dark:border-neutral-700/40 shadow-sm" />
           </div>
@@ -168,9 +188,9 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             </div>
           </div>
         ) : (
-          m.chat && (
+          cleanChatText && (
             <div className="whitespace-pre-wrap leading-relaxed text-stone-800 dark:text-stone-200 text-[14.5px]">
-              {typedChat || m.chat.slice(0, 5)}
+              {typedChat ? typedChat.replace(/<think>[\s\S]*?<\/think>/i, "").trim() : cleanChatText}
               {!isChatDone && (
                 <span className="inline-block w-2 h-4 bg-emerald-500 animate-pulse ml-0.5 align-middle rounded-sm shadow-xs" />
               )}

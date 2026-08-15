@@ -18,10 +18,11 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { getCredits, spendCredit, isUnlimited, setUnlimited } from "@/lib/credits";
+import { getCredits, spendCredit, isUnlimited, setUnlimited, initDemoCredits } from "@/lib/credits";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import FakeTerminal from "@/components/FakeTerminal";
+import { publishToCloudflareR2 } from "../lib/cloudflarePublish";
 
 // Import modular types, constants, utils, and components
 import {
@@ -400,6 +401,8 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
+    initDemoCredits();
+    setCredits(getCredits());
     const seen = sessionStorage.getItem("mini_ai_disclaimer_seen");
     const guest = localStorage.getItem("mini_ai_guest_mode") === "1";
     const googleUser = localStorage.getItem("mini_ai_google_user");
@@ -461,13 +464,23 @@ export default function Index() {
   };
 
   async function loadApiKeys() {
-    if (!user) { setApiKeys([]); return; }
-    const { data, error } = await supabase
-      .from("api_keys")
-      .select("id,label,provider,key_prefix,masked_key,active,last_used_at,created_at")
-      .order("created_at", { ascending: false });
-    if (error) { toast.error("API anahtarları yüklenemedi"); return; }
-    setApiKeys((data || []) as ApiKeyRow[]);
+    try {
+      const localKeys: ApiKeyRow[] = JSON.parse(localStorage.getItem("mini_ai_local_api_keys") || "[]");
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from("api_keys")
+          .select("id,label,provider,key_prefix,masked_key,active,last_used_at,created_at")
+          .order("created_at", { ascending: false });
+        if (!error && data && data.length > 0) {
+          setApiKeys(data as ApiKeyRow[]);
+          return;
+        }
+      }
+      setApiKeys(localKeys);
+    } catch {
+      const localKeys: ApiKeyRow[] = JSON.parse(localStorage.getItem("mini_ai_local_api_keys") || "[]");
+      setApiKeys(localKeys);
+    }
   }
 
   function makeApiKey() {
@@ -485,7 +498,6 @@ export default function Index() {
       const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
       return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
     } catch {
-      // Fallback: simple hash
       let hash = 0;
       for (let i = 0; i < value.length; i++) {
         const c = value.charCodeAt(i);
@@ -497,40 +509,74 @@ export default function Index() {
   }
 
   async function createApiKey() {
-    if (!user) { toast.error("API anahtarı için önce Google veya e-posta ile giriş yap."); return; }
     setApiKeyBusy(true);
     try {
       const key = makeApiKey();
       const prefix = key.slice(0, 12);
       const masked = `${prefix}••••••••${key.slice(-4)}`;
-      const { error } = await supabase.from("api_keys").insert({
-        user_id: user.id,
+      const newRow: ApiKeyRow = {
+        id: safeUUID(),
         label: apiKeyLabel.trim() || "Mini AI API Anahtarı",
         provider: "mini-ai",
         key_prefix: prefix,
-        key_hash: await sha256Hex(key),
         masked_key: masked,
-      });
-      if (error) throw error;
+        active: true,
+        created_at: new Date().toISOString(),
+      };
+
+      const localKeys: ApiKeyRow[] = JSON.parse(localStorage.getItem("mini_ai_local_api_keys") || "[]");
+      localStorage.setItem("mini_ai_local_api_keys", JSON.stringify([newRow, ...localKeys]));
+
+      if (user?.id) {
+        try {
+          await supabase.from("api_keys").insert({
+            user_id: user.id,
+            label: newRow.label,
+            provider: "mini-ai",
+            key_prefix: prefix,
+            key_hash: await sha256Hex(key),
+            masked_key: masked,
+          });
+        } catch {}
+      }
+
       setGeneratedApiKey(key);
       setApiKeyLabel("");
       await loadApiKeys();
-      toast.success("API anahtarı üretildi");
+      toast.success("API anahtarı üretildi ✅");
     } catch (e: any) {
       toast.error(e.message || "API anahtarı üretilemedi");
     } finally { setApiKeyBusy(false); }
   }
 
   async function toggleApiKey(id: string, active: boolean) {
-    const { error } = await supabase.from("api_keys").update({ active: !active }).eq("id", id);
-    if (error) { toast.error("Anahtar güncellenemedi"); return; }
-    await loadApiKeys();
+    try {
+      const localKeys: ApiKeyRow[] = JSON.parse(localStorage.getItem("mini_ai_local_api_keys") || "[]");
+      const updated = localKeys.map(k => k.id === id ? { ...k, active: !active } : k);
+      localStorage.setItem("mini_ai_local_api_keys", JSON.stringify(updated));
+      if (user?.id) {
+        try { await supabase.from("api_keys").update({ active: !active }).eq("id", id); } catch {}
+      }
+      await loadApiKeys();
+      toast.success("Anahtar durumu güncellendi");
+    } catch {
+      toast.error("Anahtar güncellenemedi");
+    }
   }
 
   async function deleteApiKey(id: string) {
-    const { error } = await supabase.from("api_keys").delete().eq("id", id);
-    if (error) { toast.error("Anahtar silinemedi"); return; }
-    await loadApiKeys();
+    try {
+      const localKeys: ApiKeyRow[] = JSON.parse(localStorage.getItem("mini_ai_local_api_keys") || "[]");
+      const updated = localKeys.filter(k => k.id !== id);
+      localStorage.setItem("mini_ai_local_api_keys", JSON.stringify(updated));
+      if (user?.id) {
+        try { await supabase.from("api_keys").delete().eq("id", id); } catch {}
+      }
+      await loadApiKeys();
+      toast.success("API anahtarı silindi");
+    } catch {
+      toast.error("Anahtar silinemedi");
+    }
   }
 
   function downloadProjectFiles() {
@@ -856,10 +902,25 @@ export default function Index() {
         }
       }
 
+      // İsim Tespiti ve Hafızaya Kaydetme
+      const nameMatch = input.match(/(?:benim adım|adım|ismim|bana\s+([a-zA-ZğüşıöçĞÜŞİÖÇ]+)\s+de)\s+([a-zA-ZğüşıöçĞÜŞİÖÇ]+)/i);
+      if (nameMatch) {
+        const detectedName = nameMatch[2] || nameMatch[1];
+        if (detectedName && detectedName.length > 1) localStorage.setItem("mini_ai_user_name", detectedName);
+      }
+
+      const userName = user?.name || user?.user_metadata?.full_name || localStorage.getItem("mini_ai_user_name") || (isGuest ? "Misafir" : "");
       const userMemory = localStorage.getItem("mini_ai_user_memory");
-      let enrichedSystemPrompt = userMemory 
-        ? `${AI_SYSTEM_PROMPT}\n\n[KULLANICI HAFIZASI - BUNLARI KESİNLİKLE HATIRLA]:\n${userMemory}` 
-        : AI_SYSTEM_PROMPT;
+      const pastProjectsSummary = historyList.slice(0, 6).map(h => `- "${h.prompt}"`).join("\n");
+
+      let enrichedSystemPrompt = `${AI_SYSTEM_PROMPT}
+
+### 👤 KULLANICI PROFİLİ VE GEÇMİŞ HAFIZA:
+- Kullanıcının İsmi: ${userName || "Kullanıcı"}
+- Karşındaki kullanıcının ismini BİLİYORSUN. Ona ismiyle samimi, sıcak ve doğal hitap et.
+- Geçmiş Konuşmaları / Projeleri:
+${pastProjectsSummary || "(Henüz yeni oturum)"}
+${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
 
       if (isImageOnly) {
         enrichedSystemPrompt += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Kullanıcı bu mesajı özel 'Üret' (Görsel Üretim) butonuyla gönderdi. Bu bir görsel isteğidir! Kesinlikle kod yazma, kod kutusu açma veya [FILE:...] bloğu ekleme! KESİNLİKLE cevabının en başına [IMAGE_GEN] etiketini koyup İngilizce prompt yazmalısın. Örnek: [IMAGE_GEN]yazılacak prompt[/IMAGE_GEN]";
@@ -1064,18 +1125,13 @@ export default function Index() {
   async function autoPublish(htmlCode: string, sId?: string) {
     setPublishing(true);
     setScreenshot(null);
-    log("info", "🚀 Site yayına alınıyor...");
+    log("info", "🚀 Site Cloudflare R2 üzerinden yayına alınıyor...");
     try {
-      const r = await fetch(`${FN_BASE}/publish-site`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-        body: JSON.stringify({ code: htmlCode, siteId: sId || siteId, appOrigin: window.location.origin }),
-      });
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-      setPublishedUrl(data.url);
-      log("success", `🌍 Yayında: ${data.url}`);
-      toast.success("Site yayında — tüm dünyaya açık!");
+      const targetId = sId || siteId || safeUUID();
+      const cfUrl = await publishToCloudflareR2(htmlCode, targetId);
+      setPublishedUrl(cfUrl);
+      log("success", `🌍 Cloudflare R2 ile Yayında: ${cfUrl}`);
+      toast.success("Site Cloudflare ile yayında — tüm dünyaya açık!");
 
       log("info", "📸 Ekran görüntüsü alınıyor...");
       let screenshotUrl: string | null = null;
@@ -1085,7 +1141,7 @@ export default function Index() {
           const sr = await fetch(`${FN_BASE}/screenshot-site`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-            body: JSON.stringify({ url: data.url }),
+            body: JSON.stringify({ url: cfUrl }),
           });
           const sd = await sr.json();
           if (sd.screenshotUrl) { screenshotUrl = `${sd.screenshotUrl}?t=${Date.now()}`; break; }
@@ -1094,8 +1150,6 @@ export default function Index() {
       if (screenshotUrl) {
         setScreenshot(screenshotUrl);
         log("success", "📸 Ekran görüntüsü hazır");
-        const id = sId || siteId;
-        if (id) await supabase.from("sites").update({ screenshot_url: screenshotUrl }).eq("id", id);
       }
       loadHistory();
     } catch (e: any) {
@@ -1692,7 +1746,7 @@ export default function Index() {
           </DialogHeader>
           <div className="mt-4 space-y-3 text-xs leading-relaxed text-stone-300">
             <p>
-              Bu bir yapay zekadır. 24 mühendis tarafından oluşturulmuştur bu bir demo sürümdür yapay zeka hata yapabilir arayüz de hatalar olabilir gelişen bir sürümdür ve yerli ve milli yapay zeka mini ai altyapısı kullanıyordur voice mode yavaşdır lütfen saygı gösteriniz.
+              Bu bir yapay zekadır. 24 mühendis tarafından oluşturulmuştur bu bir demo sürümdür yapay zeka hata yapabilir arayüz de hatalar olabilir gelişen bir sürümdür ve yerli ve milli yapay zeka mini ai altyapısı kullanıyordur voice mode yavaşdır lütfen saygı gösteriniz. Demo sürüm için hesabınıza 3 günlük 500 kredi tanımlanmıştır.
             </p>
           </div>
           <div className="mt-6 flex justify-end">

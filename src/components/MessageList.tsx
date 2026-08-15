@@ -32,9 +32,9 @@ export function MessageList({ messages, isLoading, welcomeText, welcomeDone, cha
         <MessageItem key={i} message={m} isStreaming={!!isLoading && i === messages.length - 1} onImageClick={onImageClick} />
       ))}
       
-      {/* AI Canlı Üretim & Tetris Animasyon Alanı */}
+      {/* AI Canlı Yanıt Durumu (Konuşma vs Kodlama) */}
       {isLoading && (
-        <div className="flex gap-3.5 md:gap-4 animate-fade-in my-6 w-full text-stone-800 dark:text-stone-100">
+        <div className="flex gap-3.5 md:gap-4 animate-fade-in my-4 w-full text-stone-800 dark:text-stone-100">
           {/* Praashoo7 Ball Loader Avatar */}
           <div className="shrink-0 mt-0.5 flex items-start justify-center" style={{ width: 32, height: 32 }}>
             <div className="main" style={{ position: 'relative', fontSize: '2.4px', marginTop: '16px' }}>
@@ -57,28 +57,46 @@ export function MessageList({ messages, isLoading, welcomeText, welcomeDone, cha
             </div>
           </div>
 
-          {/* Tetris Loader Kartı */}
           <div className="flex-1 space-y-3 min-w-0">
-            <div className="bg-stone-900/95 text-stone-100 flex items-center gap-4 rounded-2xl border border-stone-800 p-4 shadow-xl animate-fade-in">
-              <TetrisLoader
-                columns={8}
-                rows={14}
-                cellSize={3.5}
-                gap={1.5}
-                speed={40}
-                playing={true}
-                label="Web siteniz oluşturuluyor"
-              />
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
-                  <Sparkle className="w-4 h-4 animate-spin text-emerald-400" />
-                  Web siteniz / uygulamanız oluşturuluyor...
-                </p>
-                <p className="text-stone-400 text-xs leading-relaxed">
-                  Yapay zeka kodları ve bileşenleri derlerken botun Tetris oynamasını izleyebilirsiniz.
-                </p>
-              </div>
-            </div>
+            {(() => {
+              const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+              const lastUserText = lastUserMsg?.chat?.toLowerCase() || "";
+              const isSiteOrCode = /\b(site|web|kod|oyun|uygulama|html|css|react|script|tasarla|sayfa|buton|form|hesaplayıcı|dashboard|panel)\b/i.test(lastUserText);
+
+              if (isSiteOrCode) {
+                return (
+                  <div className="bg-stone-900/95 text-stone-100 flex items-center gap-4 rounded-2xl border border-stone-800 p-4 shadow-xl animate-fade-in">
+                    <TetrisLoader
+                      columns={8}
+                      rows={14}
+                      cellSize={3.5}
+                      gap={1.5}
+                      speed={40}
+                      playing={true}
+                      label="Web siteniz oluşturuluyor"
+                    />
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                        <Sparkle className="w-4 h-4 animate-spin text-emerald-400" />
+                        Web siteniz / uygulamanız oluşturuluyor...
+                      </p>
+                      <p className="text-stone-400 text-xs leading-relaxed">
+                        Yapay zeka kodları ve bileşenleri derliyor.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-stone-100 dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 text-xs font-medium text-stone-700 dark:text-stone-300 shadow-xs">
+                  <span className="flex gap-1 items-center">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  </span>
+                  <span>Mini AI düşünüyor ve yazıyor...</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
