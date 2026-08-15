@@ -1522,7 +1522,6 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
               messages={messages}
               isLoading={busy}
               welcomeText={welcomeText}
-              welcomeDone={welcomeDone}
               chatEndRef={chatEndRef}
               onImageClick={(url) => setPreviewImageUrl(url)}
               onVideoClick={(url) => setPreviewVideoUrl(url)}
