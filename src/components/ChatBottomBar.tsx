@@ -34,11 +34,16 @@ export function ChatBottomBar({
 
   const modelMap: Record<string, string> = {
     "Mini AI Hızlı": "fast",
+    "Mini AI Groq": "groq",
     "Mini AI Pro": "pro",
   };
 
   const handleModelSelect = (selectedName: string) => {
-    setModel(modelMap[selectedName] || "fast");
+    const chosen = modelMap[selectedName] || "fast";
+    setModel(chosen);
+    if (chosen === "groq") {
+      toast.warning("⚡ Mini AI Groq Modu: Bu mod aşırı hızlı metin/sohbet içindir; karmaşık siteler üretmek için tavsiye edilmez. Siteler için 'Mini AI Pro' kullanın.");
+    }
   };
 
   const handlePromptSubmit = (_value: string, meta: { model: string; effort: string; attachments: File[] }) => {

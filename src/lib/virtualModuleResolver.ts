@@ -345,14 +345,18 @@ export function buildVirtualSandboxBundle(config: VirtualSandboxConfig): string 
           const exports = {};
           const module = { exports };
           
-          const moduleFn = new Function(
-            'require', 'exports', 'module', 'React', 'useState', 'useEffect', 'useRef', 'useMemo', 'useCallback', 'useContext', 'createContext', 'LucideIcons', 'BrowserRouter', 'Routes', 'Route', 'Link', 'NavLink', 'useNavigate', 'useLocation',
-            transpiled
-          );
-          
-          moduleFn(
-            requireModule, exports, module, React, useState, useEffect, useRef, useMemo, useCallback, useContext, createContext, LucideIcons, BrowserRouter, Routes, Route, Link, NavLink, useNavigate, useLocation
-          );
+          try {
+            const moduleFn = new Function('require', 'exports', 'module', transpiled);
+            moduleFn(requireModule, exports, module);
+          } catch (execErr) {
+            console.warn("Modül yürütme hatası, otomatik onarılıyor:", cand, execErr);
+            // Otomatik onarım fallback'i: var dönüşümü ve tekrar deneme
+            const sanitized = transpiled
+              .replace(/const\s+React\s*=/g, 'var React =')
+              .replace(/let\s+React\s*=/g, 'var React =');
+            const retryFn = new Function('require', 'exports', 'module', sanitized);
+            retryFn(requireModule, exports, module);
+          }
 
           const result = module.exports.default || module.exports;
           window.__MODULE_CACHE__[cand] = result;
@@ -368,21 +372,24 @@ export function buildVirtualSandboxBundle(config: VirtualSandboxConfig): string 
     function transpileModule(code, path) {
       let transformed = code;
 
-      // 1. ES Import'ları require() çağrılarına çevir
-      // import Foo from './Foo' -> const Foo = require('./Foo');
-      transformed = transformed.replace(/import\\s+([A-Za-z0-9_]+)\\s+from\\s+['"]([^'"]+)['"];?/g, 'const $1 = require("$2");');
+      // 1. ES Import'ları çakışmasız require() çağrılarına çevir
+      // import React, { a, b } from 'react'
+      transformed = transformed.replace(/import\s+React\s*,\s*\{([^}]+)\}\s+from\s+['"]react['"];?/g, 'var React = require("react"); var { $1 } = require("react");');
       
-      // import { A, B } from 'lib' -> const { A, B } = require('lib');
-      transformed = transformed.replace(/import\\s+\\{([^}]+)\\}\\s+from\\s+['"]([^'"]+)['"];?/g, 'const { $1 } = require("$2");');
+      // import Foo from './Foo' -> var Foo = require('./Foo');
+      transformed = transformed.replace(/import\s+([A-Za-z0-9_]+)\s+from\s+['"]([^'"]+)['"];?/g, 'var $1 = require("$2");');
+      
+      // import { A, B } from 'lib' -> var { A, B } = require('lib');
+      transformed = transformed.replace(/import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"];?/g, 'var { $1 } = require("$2");');
 
-      // import * as X from 'lib' -> const X = require('lib');
-      transformed = transformed.replace(/import\\s+\\*\\s+as\\s+([A-Za-z0-9_]+)\\s+from\\s+['"]([^'"]+)['"];?/g, 'const $1 = require("$2");');
+      // import * as X from 'lib' -> var X = require('lib');
+      transformed = transformed.replace(/import\s+\*\s+as\s+([A-Za-z0-9_]+)\s+from\s+['"]([^'"]+)['"];?/g, 'var $1 = require("$2");');
 
       // 2. Export dönüşümü
-      transformed = transformed.replace(/export\\s+default\\s+function\\s+([A-Za-z0-9_]+)/g, 'function $1');
-      transformed = transformed.replace(/export\\s+default\\s+([A-Za-z0-9_]+);?/g, 'module.exports.default = $1;');
-      transformed = transformed.replace(/export\\s+default\\s+/g, 'module.exports.default = ');
-      transformed = transformed.replace(/export\\s+(const|let|var|function|class)\\s+([A-Za-z0-9_]+)/g, '$1 $2; exports.$2 = $2;');
+      transformed = transformed.replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, 'function $1');
+      transformed = transformed.replace(/export\s+default\s+([A-Za-z0-9_]+);?/g, 'module.exports.default = $1;');
+      transformed = transformed.replace(/export\s+default\s+/g, 'module.exports.default = ');
+      transformed = transformed.replace(/export\s+(const|let|var|function|class)\s+([A-Za-z0-9_]+)/g, '$1 $2; exports.$2 = $2;');
 
       // 3. Babel Transform
       try {

@@ -960,7 +960,15 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         const fileBlocks = textFiles.map(f => `[KULLANICININ YÜKLEDİĞİ DOSYA: ${f.name}]\n${f.data}\n[/KULLANICININ YÜKLEDİĞİ DOSYA]`).join("\n\n");
         promptToSend += `\n\n${fileBlocks}\n\n[KRİTİK TALİMAT]: Yüklenen dosya(lar)ın içeriğini dikkatle analiz et. Kullanıcının sorusu veya isteği doğrultusunda tam içeriği oluştur ve [FILE:${textFiles[0].name}]...[/FILE] etiketiyle eksiksiz olarak çıktı ver.`;
       } else if (!isImageOnly) {
-        promptToSend += `\n\n[KRİTİK MİMARİ TALİMATI - KESİNLİKLE ÇOKLU DOSYA JSON YAP]:\nBu isteği tek bir HTML dosyası veya düz metin olarak YAZMA!\nLovable standardında tam yığın çoklu dosya (src/App.jsx, src/components/Navbar.jsx, src/pages/Home.jsx, src/pages/Dashboard.jsx, src/index.css ve database.sql_queries) içeren geçerli tek bir JSON objesi döndür!`;
+        const lowerInput = input.toLowerCase().trim();
+        const isAppRequest = /yap|oluştur|yaz|tasarla|kodla|site|uygulama|app|dashboard|panel|saas|sayfa|portal|platform|ekran|oyun|game|clone|market|e-ticaret|landing|web/i.test(lowerInput);
+        const isQuestion = /^(merhaba|selam|nasılsın|kimsin|nedir|ne demek|neden|nasıl|açıkla|anlat|yardım|tavsiye|fikir|kim|hangi|kaç|mi|mı|mu|mü|sen|günaydın|iyi günler)\b/i.test(lowerInput) || lowerInput.endsWith("?") || lowerInput.includes("?");
+
+        if (isAppRequest && !isQuestion) {
+          promptToSend += `\n\n[KRİTİK MİMARİ TALİMATI - KESİNLİKLE ÇOKLU DOSYA JSON YAP]:\nBu bir uygulama/site geliştirme isteğidir. Lovable standardında tam yığın çoklu dosya (src/App.jsx, src/components/Navbar.jsx, src/pages/Home.jsx, src/pages/Dashboard.jsx, src/index.css ve database.sql_queries) içeren geçerli tek bir JSON objesi döndür!`;
+        } else if (isQuestion) {
+          promptToSend += `\n\n[KRİTİK TALİMAT - SADECE SOHBET/BİLGİ]: Kullanıcı bir soru sordu, sohbet ediyor veya açıklama istiyor. KESİNLİKLE site/uygulama/kod JSON'ı üretme! Doğrudan samimi, açıklayıcı, Türkçe metin cevabı ver.`;
+        }
       }
 
       if (useAgent) {

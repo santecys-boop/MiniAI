@@ -311,7 +311,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       onSubmit,
       placeholder = "Mesaj yazın...",
       className,
-      models = ["Mini AI Hızlı", "Mini AI Pro"],
+      models = ["Mini AI Hızlı", "Mini AI Groq", "Mini AI Pro"],
       efforts = ["Low", "Medium", "Max Effort"],
       defaultValue = "",
       value: controlledValue,
