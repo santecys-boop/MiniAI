@@ -1734,7 +1734,7 @@ export default function Index() {
               </div>
 
               <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-900/60 border border-stone-800/80">
-                <Code className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <Code2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-bold text-white text-sm">💻 Akıllı Kodlama & Otomatik Hata Düzeltme</h4>
                   <p className="text-stone-400 mt-0.5">HTML, React, Python, JavaScript gibi tüm dillerde projeler geliştirir, hataları tespit edip kendiliğinden onarır.</p>
