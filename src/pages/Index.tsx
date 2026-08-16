@@ -367,6 +367,33 @@ export default function Index() {
     }
   }, []);
 
+  // Her girişte ve açılışta eski demo APK indirme bildirimi
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      toast(
+        (t) => (
+          <div className="w-full flex items-center justify-center p-0.5">
+            <a
+              href="https://drive.google.com/file/d/10OvoSgsj_Xju1D5ndaTS-FFflY8eJ-oY/view?usp=drivesdk"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => toast.dismiss(t)}
+              className="w-full text-center px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Eski demonun APK'sını indirmek için tıkla</span>
+            </a>
+          </div>
+        ),
+        {
+          duration: 10000,
+          position: "top-center",
+        }
+      );
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [user]);
+
   // AI Bridge Event Listener
   useEffect(() => {
     async function handleAIBridgeMessage(event: MessageEvent) {
@@ -1418,6 +1445,15 @@ export default function Index() {
               <span className="font-semibold text-stone-900 text-[15px] leading-none">Mini AI</span>
               {historyList.length > 0 && <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-stone-400" />}
             </button>
+            <a
+              href="https://drive.google.com/file/d/10OvoSgsj_Xju1D5ndaTS-FFflY8eJ-oY/view?usp=drivesdk"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-sm transition-all active:scale-[0.98]"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Eski demonun APK'sını indirmek için tıkla</span>
+            </a>
           </div>
           <div className="flex items-center gap-2">
             <UserProfilePopover
@@ -1696,6 +1732,15 @@ export default function Index() {
             </div>
           </ScrollArea>
           <div className="p-4 border-t border-stone-200 space-y-2">
+            <a
+              href="https://drive.google.com/file/d/10OvoSgsj_Xju1D5ndaTS-FFflY8eJ-oY/view?usp=drivesdk"
+              target="_blank"
+              rel="noreferrer"
+              className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md transition-all active:scale-[0.98] text-center"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Eski demonun APK'sını indirmek için tıkla</span>
+            </a>
             <button onClick={() => { setPromoOpen(true); setMenuOpen(false); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-stone-200/60 text-left text-sm text-stone-700">
               <Tag className="w-4 h-4" /> Promo Kodu Gir
