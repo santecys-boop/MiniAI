@@ -37,8 +37,9 @@ import {
 } from "../utils";
 import { MessageList } from "../components/MessageList";
 import { ChatBottomBar } from "../components/ChatBottomBar";
-import { AdminDialog } from "../components/AdminDialog";
 import { runAutonomousAgent } from "../lib/agentEngine";
+import { dispatchAgentExecution, detectExecutionMode, saveProjectSnapshot, getProjectSnapshot } from "../services/agentDispatcher";
+import { runTerminalBlocks, formatToolResults } from "../lib/aiTerminalBridge";
 import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import UserProfilePopover from "../components/UserProfilePopover";
 import { ProjectFileTree } from "../components/ProjectFileTree";
@@ -878,16 +879,6 @@ export default function Index() {
     }
 
     const lower = currentPrompt.toLowerCase();
-    const explicitAutomation = !isFix && !isImageOnly && /\b(terminal|linux|bash|otomasyon|vm|e2b)\b/.test(lower);
-    const wantsSite = !isFix && !isImageOnly && /\b(site|sayfa|page|landing|portfolyo|portfolio|uygulama|app|web ?site|tasarla|tasarım|yap bana|bana .* yap|oluştur|build|create)\b/.test(lower);
-    const shouldUseE2B = false;
-    const useAgent = false;
-
-    const uploadedFile = !isFix ? pendingAttachments.find(a => a.kind === "file") : undefined;
-    const isZip = !!uploadedFile && /\.zip$/i.test(uploadedFile.name);
-    const wantsZipEdit = isZip && /\b(düzelt|düzenle|değiştir|güncelle|ekle|kaldır|sil|çevir|refactor|fix|edit|update|değistir)\b/.test(lower);
-    const shouldUseFileEdit = !isFix && wantsZipEdit;
-
     const userMsg: Msg = { role: "user", chat: isFix ? `🔧 Düzelt: ${currentPrompt}` : isImageOnly ? `🎨 Görsel Üret: ${currentPrompt}` : currentPrompt, attachments: pendingAttachments };
     setMessages(m => [...m, userMsg]);
     log("info", `📤 ${isFix ? "🔧 Düzeltme: " : isImageOnly ? "🎨 Görsel Üret: " : ""}${currentPrompt.slice(0, 60) || "(sadece ek)"}`);
@@ -900,111 +891,6 @@ export default function Index() {
     const imgs = pendingAttachments.filter(a => a.kind === "image").map(a => a.data);
 
     try {
-      if (shouldUseFileEdit && uploadedFile) {
-        const placeholder: Msg = { role: "assistant", chat: "🤖 E2B sandbox açılıyor — dosyan yükleniyor...", autoEvents: [], autoUrl: undefined };
-        setMessages(m => [...m, placeholder]);
-        const isZip = /\.zip$/i.test(uploadedFile.name);
-        const fileBase64 = isZip
-          ? uploadedFile.data.split(",")[1] || ""
-          : btoa(unescape(encodeURIComponent(uploadedFile.data)));
-        const res = await fetch(`${FN_BASE}/agent-file-edit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", apikey: ANON, Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({
-            fileName: uploadedFile.name,
-            fileBase64,
-            instruction: input,
-          }),
-        });
-        if (!res.body) throw new Error("stream yok");
-        const reader = res.body.getReader();
-        const dec = new TextDecoder();
-        let buf = "";
-        const events: AutoEvent[] = [];
-        let downloadUrl: string | undefined;
-        let downloadName: string | undefined;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          const chunks = buf.split("\n\n");
-          buf = chunks.pop() || "";
-          for (const c of chunks) {
-            const line = c.split("\n").find((l) => l.startsWith("data: "));
-            if (!line) continue;
-            try {
-              const ev = JSON.parse(line.slice(6)) as AutoEvent;
-              events.push(ev);
-              if (ev.type === "step") log("ai", `▶ ${ev.title}`);
-              if (ev.type === "log") log("info", `$ ${ev.text}`);
-              if (ev.type === "error") log("error", `⚠ ${ev.message}`);
-              if (ev.type === "done") {
-                log("success", "✓ Dosya düzenleme tamamlandı");
-                downloadName = ev.fileName;
-                downloadUrl = `data:application/zip;base64,${ev.fileBase64}`;
-              }
-              const snap = [...events];
-              setMessages(m => m.map(msg => msg === placeholder ? {
-                ...msg, autoEvents: snap, autoUrl: downloadUrl, downloadName,
-                chat: downloadUrl ? `✅ Hazır — ${downloadName}` : "🤖 Çalışıyor...",
-              } : msg));
-            } catch { /* empty */ }
-          }
-        }
-        setAgentAlts(null);
-        setInput(""); setPendingAttachments([]);
-        return;
-      }
-
-      if (shouldUseE2B) {
-        const promptCopy = input;
-        const placeholder: Msg = { role: "assistant", chat: "🤖 E2B sandbox başlatılıyor...", autoEvents: [], autoUrl: undefined };
-        setMessages(m => [...m, placeholder]);
-        const res = await fetch(`${FN_BASE}/agent-run`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", apikey: ANON, Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({ prompt: promptCopy }),
-        });
-        if (!res.body) throw new Error("stream yok");
-        const reader = res.body.getReader();
-        const dec = new TextDecoder();
-        let buf = "";
-        const events: AutoEvent[] = [];
-        let liveUrl: string | undefined;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          const chunks = buf.split("\n\n");
-          buf = chunks.pop() || "";
-          for (const c of chunks) {
-            const line = c.split("\n").find((l) => l.startsWith("data: "));
-            if (!line) continue;
-            try {
-              const ev = JSON.parse(line.slice(6)) as AutoEvent;
-              events.push(ev);
-              if (ev.type === "url" || (ev.type === "done" && ev.url)) liveUrl = ev.url;
-              if (ev.type === "step") log("ai", `▶ ${ev.title}`);
-              if (ev.type === "log") log("info", `$ ${ev.text}`);
-              if (ev.type === "error") log("error", `⚠ ${ev.message}`);
-              if (ev.type === "done") log("success", `✓ Otomasyon tamamlandı`);
-              const snap = [...events]; const urlSnap = liveUrl;
-              setMessages(m => m.map(msg => msg === placeholder ? { ...msg, autoEvents: snap, autoUrl: urlSnap, chat: urlSnap ? `✅ Hazır — ${urlSnap}` : "🤖 Çalışıyor..." } : msg));
-            } catch { /* empty */ }
-          }
-        }
-        setAgentAlts(null);
-        if (explicitAutomation && !wantsSite) {
-          setInput(""); setPendingAttachments([]);
-          return;
-        }
-      }
-
-      const wantsCompileOrBuild = /\b(apk|zip|build|derle|compile|run|çalıştır|calis|execute|bin|exe|paketle|terminal|linux|bash|npm|pip|python|docker|git|node|server|sh)\b/i.test(lower);
-
-      let parsed: ReturnType<typeof parseAIResponse>;
-      let allCandidates: { idx: number; text: string }[] | undefined;
-
       if (!isUnlimited()) {
         const c = getCredits();
         if (c.count <= 0) {
@@ -1038,11 +924,6 @@ export default function Index() {
         toast.info(`🔍 Dur bir bakayım... ${attachedImages.length} adet görsel taranıyor...`);
       }
 
-      const isAppOrSaaSRequest = /\b(uygulama|app|saas|panel|dashboard|platform|site|yazılım|tool|sistem|proje|tasarla|oluştur|yap|seçimlerim|tercihlerim)\b/i.test(lower);
-      if (isAppOrSaaSRequest && !isFix) {
-        promptToSend = `${promptToSend}\n\n[MİMARİ DİREKTİFİ: Lütfen modüler, gerçek React + TypeScript mimarisinde üretim yap. Projeyi ayrı dosyalara böl: 'src/App.tsx' (Router ve Ana Düzen), 'src/pages/*.tsx' (Örn: Dashboard.tsx, Analytics.tsx, Settings.tsx), 'src/components/*.tsx' (Navbar.tsx, Sidebar.tsx, Modal.tsx), 'src/types.ts'. Her dosyayı [FILE:src/dosya.tsx]...[/FILE] veya araç çağrılarıyla teslim et!]`;
-      }
-
       let capturedWebQuery: string | undefined = undefined;
       let capturedWebSources: any[] | undefined = undefined;
 
@@ -1063,16 +944,12 @@ export default function Index() {
         }
       }
 
-      // ── GERÇEK OTONOM AJAN DÖNGÜSÜ (Proje / SaaS / Web Uygulaması İstekleri) ──
-      const lastProjectMsg = [...messages].reverse().find(m => m.role === "assistant" && m.projectFiles && m.projectFiles.length > 0);
-      const existingProjectFiles = lastProjectMsg?.projectFiles || (code ? [{ path: "src/App.tsx", content: code, lang: "tsx" as const }] : []);
-
-      const isAutonomousAppRequest = (wantsSite || isAppOrSaaSRequest || model === "pro") && !isFix && !shouldUseFileEdit;
-      if (isAutonomousAppRequest) {
-        log("ai", "🧠 Otonom Ajan Başlatıldı: Çoklu dosya ve araç çağırma döngüsü çalışıyor...");
+      // ── MERKEZİ AJAN YÖNLENDİRİCİSİ (E2B VM, ZIP Modifikasyon, Otonom Tool Loop) ──
+      const executionMode = detectExecutionMode(currentPrompt, pendingAttachments, isFix, isImageOnly, model);
+      if (executionMode !== "STANDARD_CHAT") {
         const placeholder: Msg = {
           role: "assistant",
-          chat: "🧠 Otonom Ajan Geliştirme Döngüsü Başlatılıyor...",
+          chat: "🧠 Otonom Ajan Başlatılıyor...",
           autoEvents: []
         };
         setMessages(m => [...m, placeholder]);
@@ -1080,19 +957,18 @@ export default function Index() {
         setPendingAttachments([]);
 
         const events: AutoEvent[] = [];
-        const agentResult = await runAutonomousAgent({
+        const result = await dispatchAgentExecution({
           prompt: promptToSend,
           systemPrompt,
           model,
-          existingFiles: existingProjectFiles,
+          pendingAttachments,
+          isFix,
+          isImageOnly,
+          fnBaseUrl: FN_BASE,
+          anonKey: ANON,
+          onLog: log,
           onEvent: (ev) => {
             events.push(ev);
-            if (ev.type === "step") log("ai", `▶ ${ev.title}`);
-            if (ev.type === "log") log("info", `${ev.text}`);
-            if (ev.type === "file") log("info", `📝 Dosya: ${ev.path}`);
-            if (ev.type === "error") log("error", `⚠ ${ev.message}`);
-            if (ev.type === "test") log(ev.ok ? "success" : "error", ev.ok ? "✅ Test & Derleme Başarılı" : "❌ Derleme Hatası");
-            
             setMessages(m => m.map(msg => msg === placeholder ? {
               ...msg,
               autoEvents: [...events],
@@ -1101,21 +977,21 @@ export default function Index() {
           }
         });
 
-        if (agentResult.finalMsg.code) {
-          setCode(agentResult.finalMsg.code);
+        if (result.finalMsg.code) {
+          setCode(result.finalMsg.code);
           setCodeType("html");
         }
 
         setMessages(m => m.map(msg => msg === placeholder ? {
           ...msg,
-          ...agentResult.finalMsg,
+          ...result.finalMsg,
           autoEvents: events
         } : msg));
 
-        if (user?.id && agentResult.finalMsg.code) {
+        if (user?.id && result.finalMsg.code) {
           const { data: row } = await supabase.from("sites").insert({
             prompt: currentPrompt,
-            code: agentResult.finalMsg.code,
+            code: result.finalMsg.code,
             type: "html",
             model,
             user_id: user.id
@@ -1124,7 +1000,6 @@ export default function Index() {
         }
 
         setBusy(false);
-        log("success", `✅ Otonom Ajan: ${agentResult.finalMsg.projectFiles?.length || 1} dosya başarıyla derlendi!`);
         return;
       }
 
@@ -1284,12 +1159,24 @@ export default function Index() {
         log("ai", `🧠 Kalıcı Hafıza güncellendi: ${newMemory}`);
       }
 
+      // ── AI Terminal Köprüsü ([[TERM: <komut>]]) ──
+      let terminalLogs: string | undefined;
+      if (aiTextResponse.includes("[[TERM:")) {
+        log("ai", "⚡ AI Terminal Komutları Algılandı: Komutlar çalıştırılıyor...");
+        const termResults = await runTerminalBlocks(aiTextResponse);
+        if (termResults.length > 0) {
+          terminalLogs = formatToolResults(termResults);
+          log("info", `💻 Terminal: ${termResults.length} komut başarıyla tamamlandı.`);
+        }
+      }
+
       const newMsg: Msg = { 
         role: "assistant", 
         ...parsed, 
         chat: finalChat,
         webSearchQuery: capturedWebQuery,
         webSearchSources: capturedWebSources,
+        compileOutput: terminalLogs || parsed.compileOutput,
         effort: opts?.effort || "Medium",
         agentCandidates: allCandidates,
         ...(parsed.code && parsed.codeType === "html" ? { code: injectAIBridge(parsed.code) } : {}),
