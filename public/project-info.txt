@@ -1,0 +1,29 @@
+MINI AI PROJECT SUMMARY & ARCHITECTURE SPECIFICATION
+======================================================
+Status: Active & Operational
+Live URL: https://miniaii.surge.sh
+Mirrors: https://miniai-official.surge.sh | https://miniai-app.surge.sh
+Source Zip: https://miniaii.surge.sh/miniai-latest.zip
+GitHub: https://github.com/santecys-boop/MiniAI
+
+1. AUTONOMOUS AGENT ENGINE (src/lib/agentEngine.ts):
+- Implements real iterative agent loop: while (iteration < MAX_ITERATIONS && !isDone)
+- Model invokes tools: write_file, line_replace (surgical patch), read_file, list_files, run_build, search_web
+- Feedback loop captures syntax diagnostics and compilation errors for automatic self-healing.
+
+2. COMPILER & SYNTAX VALIDATOR (src/lib/codeCompilerValidator.ts):
+- AST & TSX/JSX parser with import resolution verification.
+- Validates components, standard packages (React, Lucide, Recharts, Framer Motion), and module exports.
+
+3. VIRTUAL IN-BROWSER RUNTIME (src/lib/virtualModuleResolver.ts):
+- Babel Standalone with React & TypeScript presets.
+- Full React Router emulator (BrowserRouter, Routes, Route, Link, NavLink, useNavigate, useLocation).
+- Lucide React icon proxy engine.
+
+4. E2B CLOUD LINUX VM SERVER AGENT (supabase/functions/agent-run/index.ts):
+- Multi-turn while (turn < MAX_TURNS && !testOk) sandbox loop.
+- Executes real npm install, server startup, and live GET HTTP tests.
+- Snapshots workspace files and returns to client.
+
+5. AI TERMINAL BRIDGE (src/lib/aiTerminalBridge.ts):
+- Parses [[TERM: <cmd>]] blocks and runs them sequentially on Piston / Linux sandbox.
