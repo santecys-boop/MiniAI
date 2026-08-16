@@ -978,7 +978,6 @@ export default function VoiceMode({
     busyRef.current = false;
     attachRecorder(streamRef.current);
     setState("listening");
-    setCaption("");
     startVadLoop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachRecorder]);
@@ -1349,31 +1348,91 @@ export default function VoiceMode({
     });
   }
 
+  /** Web Speech API ile yedek seslendirme (Supabase kredisi bittiğinde veya hata verdiğinde devreye girer) */
+  function speakWithWebSpeech(text: string, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve) => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+        resolve();
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "tr-TR";
+      utterance.rate = Math.max(0.8, Math.min(1.5, Number(speedRef.current) || 1.0));
+      utterance.pitch = voiceRef.current === "nova" || voiceRef.current === "shimmer" ? 1.08 : 0.95;
+
+      const voices = window.speechSynthesis.getVoices();
+      const trVoice = voices.find((v) => v.lang.startsWith("tr") || v.lang.includes("tr"));
+      if (trVoice) utterance.voice = trVoice;
+
+      let timer: any = null;
+      const startPulse = () => {
+        timer = setInterval(() => {
+          if (signal.aborted) {
+            clearInterval(timer);
+            return;
+          }
+          smoothLevelRef.current = 0.25 + Math.random() * 0.45;
+          setLevel(smoothLevelRef.current);
+        }, 100);
+      };
+
+      const finish = () => {
+        if (timer) clearInterval(timer);
+        setLevel(0);
+        signal.removeEventListener("abort", onAbort);
+        resolve();
+      };
+
+      const onAbort = () => {
+        window.speechSynthesis.cancel();
+        finish();
+      };
+
+      signal.addEventListener("abort", onAbort);
+      utterance.onstart = startPulse;
+      utterance.onend = finish;
+      utterance.onerror = finish;
+
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+
   /**
    * Metni seslendir; bitince onDone çağrılır.
-   * HIZ: metin cümlelere bölünür, TÜM parçaların TTS'i aynı anda başlatılır —
-   * ilk cümle kısa olduğu için ses neredeyse anında başlar, kalan parçalar
-   * o çalarken arka planda iner ve peş peşe çalınır.
+   * HIZ: Önce Supabase OpenAI TTS ile paralel denenir, hata durumunda Web Speech API ile canlı seslendirilir.
    */
   async function speak(text: string, onDone: () => void) {
     const ac = new AbortController();
     abortRef.current = ac;
 
     const chunks = splitForTts(text);
-    /* Tüm parçaları paralel indir — sıra playback'te korunur */
-    const urlPromises = chunks.map((c) => fetchTtsUrl(c, ac.signal));
+    let supabaseSuccess = false;
 
-    for (const p of urlPromises) {
-      if (closedRef.current || ac.signal.aborted) return;
-      try {
+    try {
+      /* Tüm parçaları paralel indir — sıra playback'te korunur */
+      const urlPromises = chunks.map((c) => fetchTtsUrl(c, ac.signal));
+
+      for (const p of urlPromises) {
+        if (closedRef.current || ac.signal.aborted) return;
         const url = await p;
         if (closedRef.current || ac.signal.aborted) {
           URL.revokeObjectURL(url);
           return;
         }
         await playUrl(url, ac.signal);
-      } catch {
-        /* tek parça hata verirse kalanlarla devam et */
+        supabaseSuccess = true;
+      }
+    } catch (err) {
+      console.warn("Supabase OpenAI TTS failed or out of credits, switching to Web Speech fallback...", err);
+    }
+
+    if (!supabaseSuccess && !closedRef.current && !ac.signal.aborted) {
+      try {
+        await speakWithWebSpeech(text, ac.signal);
+      } catch (wsErr) {
+        console.warn("Web speech fallback error:", wsErr);
       }
     }
 
