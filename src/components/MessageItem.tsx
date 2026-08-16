@@ -247,7 +247,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
               status="failed"
               errorMessage={m.imageGenError}
             />
-          ) : imageUrl ? (
+          ) : (imageUrl || m.imageGenUrl) ? (
             <div className="space-y-2 my-2 animate-fade-in">
               {cleanChatText && !cleanChatText.includes("Oluşturulan Görsel") && !cleanChatText.includes("Görseliniz") && (
                 <div className="whitespace-pre-wrap leading-relaxed text-stone-800 dark:text-stone-200 text-[14.5px]">
@@ -257,7 +257,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
               <GeminiImageGeneratorCard
                 prompt={m.imageGenPrompt || cleanChatText || "Yapay Zeka Tasarımı"}
                 status="completed"
-                imageUrl={imageUrl}
+                imageUrl={imageUrl || m.imageGenUrl}
                 onImageClick={onImageClick}
               />
             </div>
