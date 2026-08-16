@@ -44,9 +44,9 @@ import { toast } from "sonner";
 import { getCredits, spendCredit, isUnlimited } from "@/lib/credits";
 import { executeMultiProviderChat, AIMessage } from "@/services/aiProviderService";
 import {
-  synthesizeNeuralAudio,
+  speakNeuralUtterance,
+  stopNeuralSpeech,
   NEURAL_VOICES,
-  splitSpeechChunks,
   NeuralVoiceDef,
 } from "@/services/neuralVoiceService";
 
@@ -879,10 +879,12 @@ export default function VoiceMode({
     closedRef.current = true;
     abortRef.current?.abort();
     abortRef.current = null;
+    stopNeuralSpeech();
     try {
       if (recognitionRef.current) {
         recognitionRef.current.onresult = null;
         recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
         recognitionRef.current.stop();
         recognitionRef.current = null;
       }
@@ -923,23 +925,53 @@ export default function VoiceMode({
     if (!SR) return;
     try {
       if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch { /* geç */ }
+        try {
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onend = null;
+          recognitionRef.current.stop();
+        } catch { /* geç */ }
       }
       const r = new SR();
       r.continuous = true;
       r.interimResults = true;
       r.lang = "tr-TR";
+      r.maxAlternatives = 1;
+
       r.onresult = (e: any) => {
-        let full = "";
+        let interim = "";
+        let final = "";
         for (let i = 0; i < e.results.length; i++) {
-          full += e.results[i][0].transcript + " ";
+          if (e.results[i].isFinal) {
+            final += e.results[i][0].transcript + " ";
+          } else {
+            interim += e.results[i][0].transcript + " ";
+          }
         }
-        if (full.trim()) {
-          speechTranscriptRef.current = full.trim();
+        const combined = (final + interim).trim();
+        if (combined) {
+          speechTranscriptRef.current = combined;
+          setCaption(combined);
+          smoothLevelRef.current = 0.4 + Math.random() * 0.4;
+          setLevel(smoothLevelRef.current);
         }
       };
-      r.onerror = () => {};
-      r.start();
+
+      r.onerror = (err: any) => {
+        console.warn("Speech recognition event error:", err);
+      };
+
+      r.onend = () => {
+        if (!closedRef.current && stateRef.current === "listening" && !busyRef.current) {
+          try { r.start(); } catch { /* geç */ }
+        }
+      };
+
+      try {
+        r.start();
+      } catch (err) {
+        console.warn("Speech recognition start warning:", err);
+      }
       recognitionRef.current = r;
     } catch (e) {
       console.warn("SpeechRecognition init warning:", e);
@@ -1081,6 +1113,9 @@ export default function VoiceMode({
       streamRef.current = stream;
 
       const ctx = new AudioContext();
+      if (ctx.state === "suspended") {
+        await ctx.resume().catch(() => {});
+      }
       audioCtxRef.current = ctx;
       const src = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
@@ -1255,92 +1290,34 @@ export default function VoiceMode({
     await speak(reply, () => restartRecording());
   }
 
-  /** Bir metin parçasının TTS sesini indir, object URL döndür */
-  async function fetchTtsUrl(text: string, signal: AbortSignal): Promise<string> {
-    return await synthesizeNeuralAudio(text, voiceRef.current, speedRef.current, signal);
-  }
-
-  /** Bir object URL'i çal; bitince/hata olunca/iptal edilince resolve olur */
-  function playUrl(url: string, signal: AbortSignal): Promise<void> {
-    return new Promise((resolve) => {
-      const audio = new Audio(url);
-      audio.preload = "auto";
-      playerRef.current = audio;
-
-      /* Küre, asistanın sesiyle senkron nefes alsın */
-      try {
-        const ctx = audioCtxRef.current;
-        if (ctx && ctx.state !== "closed") {
-          const elSrc = ctx.createMediaElementSource(audio);
-          const an = ctx.createAnalyser();
-          an.fftSize = 512;
-          an.smoothingTimeConstant = 0.5;
-          elSrc.connect(an);
-          an.connect(ctx.destination);
-          const buf = new Uint8Array(an.frequencyBinCount);
-          const pulse = () => {
-            if (playerRef.current !== audio || audio.paused || audio.ended) return;
-            an.getByteTimeDomainData(buf);
-            const rms = computeRms(buf);
-            smoothLevelRef.current =
-              smoothLevelRef.current * 0.72 + clamp(rms / 28, 0, 1) * 0.28;
-            setLevel(smoothLevelRef.current);
-            requestAnimationFrame(pulse);
-          };
-          audio.addEventListener("play", () => pulse(), { once: true });
-        }
-      } catch {
-        /* createMediaElementSource desteklenmiyorsa küre sadece nefes animasyonuyla kalır */
-      }
-
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        URL.revokeObjectURL(url);
-        if (playerRef.current === audio) playerRef.current = null;
-        signal.removeEventListener("abort", onAbort);
-        resolve();
-      };
-      const onAbort = () => {
-        try { audio.pause(); } catch { /* geç */ }
-        finish();
-      };
-      signal.addEventListener("abort", onAbort);
-      audio.onended = finish;
-      audio.onerror = finish;
-      audio.play().then(() => haptic(6)).catch(finish);
-    });
-  }
-
   /**
    * Metni seslendir; bitince onDone çağrılır.
-   * ElevenLabs kalitesinde Neural Speech motoru ile seslendirilir.
+   * Doğal Neural Voice motoru ile seslendirilir.
    */
   async function speak(text: string, onDone: () => void) {
-    const ac = new AbortController();
-    abortRef.current = ac;
-
-    const chunks = splitSpeechChunks(text, 180);
-
+    let speakingPulse: any = null;
     try {
-      /* Tüm parçaları paralel indir — sıra playback'te korunur */
-      const urlPromises = chunks.map((c) => fetchTtsUrl(c, ac.signal));
-
-      for (const p of urlPromises) {
-        if (closedRef.current || ac.signal.aborted) return;
-        const url = await p;
-        if (closedRef.current || ac.signal.aborted) {
-          URL.revokeObjectURL(url);
+      speakingPulse = setInterval(() => {
+        if (closedRef.current || stateRef.current !== "speaking") {
+          clearInterval(speakingPulse);
           return;
         }
-        await playUrl(url, ac.signal);
-      }
+        smoothLevelRef.current = 0.35 + Math.random() * 0.45;
+        setLevel(smoothLevelRef.current);
+      }, 100);
+
+      await speakNeuralUtterance(text, voiceRef.current, speedRef.current, () => {
+        smoothLevelRef.current = 0.6 + Math.random() * 0.4;
+        setLevel(smoothLevelRef.current);
+      });
     } catch (err) {
-      console.warn("Neural voice playback error:", err);
+      console.warn("Speech playback error:", err);
+    } finally {
+      if (speakingPulse) clearInterval(speakingPulse);
+      setLevel(0);
     }
 
-    if (!closedRef.current && !ac.signal.aborted) onDone();
+    if (!closedRef.current) onDone();
   }
 
   /* ══════════════════════════════════════════════════════════════════════
@@ -1350,6 +1327,7 @@ export default function VoiceMode({
   /** Asistan konuşurken sözünü kes ve dinlemeye dön (barge-in) */
   const interrupt = useCallback(() => {
     abortRef.current?.abort();
+    stopNeuralSpeech();
     try { playerRef.current?.pause(); } catch { /* geç */ }
     playerRef.current = null;
     haptic([8, 30, 8]);
@@ -1382,29 +1360,22 @@ export default function VoiceMode({
 
   /** Ses önizlemesi çal/durdur */
   const previewVoice = useCallback(async (v: VoiceDef) => {
-    /* Zaten çalıyorsa durdur */
     if (previewingId === v.id) {
-      try { previewPlayerRef.current?.pause(); } catch { /* geç */ }
-      previewPlayerRef.current = null;
+      stopNeuralSpeech();
       setPreviewingId(null);
       return;
     }
-    try { previewPlayerRef.current?.pause(); } catch { /* geç */ }
+    stopNeuralSpeech();
     setPreviewingId(v.id);
     try {
-      const url = await synthesizeNeuralAudio(v.preview, v.id, 1);
-      const audio = new Audio(url);
-      previewPlayerRef.current = audio;
-      const done = () => {
-        URL.revokeObjectURL(url);
-        setPreviewingId((cur) => (cur === v.id ? null : cur));
-      };
-      audio.onended = done;
-      audio.onerror = done;
-      await audio.play();
+      await speakNeuralUtterance(v.preview, v.id, 1, () => {
+        smoothLevelRef.current = 0.5 + Math.random() * 0.4;
+        setLevel(smoothLevelRef.current);
+      });
     } catch {
-      setPreviewingId(null);
       toast.error("Önizleme çalınamadı");
+    } finally {
+      setPreviewingId((cur) => (cur === v.id ? null : cur));
     }
   }, [previewingId]);
 
