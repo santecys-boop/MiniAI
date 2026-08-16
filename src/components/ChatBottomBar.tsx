@@ -24,12 +24,15 @@ export type ChatBottomBarProps = {
   imageInputRef: React.RefObject<HTMLInputElement | null>;
   cameraInputRef: React.RefObject<HTMLInputElement | null>;
   openPricing: () => void;
+  isImageMode?: boolean;
+  setIsImageMode?: (v: boolean | ((prev: boolean) => boolean)) => void;
 };
 
 export function ChatBottomBar({
   input, setInput, pendingAttachments, setPendingAttachments, busy, setBusy,
   model, setModel, hasCode, send, toggleMic, attachOpen, setAttachOpen,
-  fileInputRef, imageInputRef, cameraInputRef, openPricing
+  fileInputRef, imageInputRef, cameraInputRef, openPricing,
+  isImageMode = false, setIsImageMode
 }: ChatBottomBarProps) {
 
   const modelMap: Record<string, string> = {
@@ -108,6 +111,8 @@ export function ChatBottomBar({
         placeholder="Mesaj yazın veya konuşmak için dokunun..."
         models={["Mini AI Hızlı", "Mini AI Pro"]}
         efforts={["Low", "Medium", "Max Effort"]}
+        isImageMode={isImageMode}
+        onToggleImageMode={() => setIsImageMode?.(prev => !prev)}
       />
     </div>
   );

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { Sparkles } from "lucide-react";
 
 // ----------------------------------------------------------------------
 // Transition Physics
@@ -304,6 +305,8 @@ export interface PromptInputProps {
   attachPopoverNode?: React.ReactNode;
   busy?: boolean;
   onStop?: () => void;
+  isImageMode?: boolean;
+  onToggleImageMode?: () => void;
 }
 
 export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
@@ -324,6 +327,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       attachPopoverNode,
       busy = false,
       onStop,
+      isImageMode = false,
+      onToggleImageMode,
     },
     ref
   ) => {
@@ -760,7 +765,10 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               overflow: expanded ? "visible" : "hidden",
             }}
             className={cn(
-              "relative w-full border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm focus-within:border-stone-400 dark:focus-within:border-stone-600 focus-within:ring-1 focus-within:ring-stone-400/20 hover:border-stone-300 dark:hover:border-stone-700 z-10",
+              "relative w-full border bg-white dark:bg-stone-900 shadow-sm focus-within:ring-1 z-10 transition-colors",
+              isImageMode
+                ? "border-purple-500/70 dark:border-purple-500/80 ring-1 ring-purple-500/30 shadow-purple-500/10"
+                : "border-stone-200 dark:border-stone-800 focus-within:border-stone-400 dark:focus-within:border-stone-600 focus-within:ring-stone-400/20 hover:border-stone-300 dark:hover:border-stone-700",
               expanded ? "cursor-text" : "cursor-default"
             )}
           >
@@ -787,7 +795,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                   setIsModelSelectOpen(false);
                 }
               }}
-              placeholder={placeholder}
+              placeholder={isImageMode ? "Görsel için bir açıklama yazın (örn: araba, kedi, m)..." : placeholder}
               aria-label="Prompt"
               disabled={isRecording}
               style={{
@@ -822,12 +830,13 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               onClick={expand}
               style={{ transition: isSmoothResize ? "none" : "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)" }}
               className={cn(
-                "absolute inset-x-0 top-0 z-[1] cursor-text pl-4 pr-12 py-[15px] text-left text-sm font-medium leading-[17px] text-stone-400 dark:text-stone-500 outline-none",
+                "absolute inset-x-0 top-0 z-[1] cursor-text pl-4 pr-12 py-[15px] text-left text-sm font-medium leading-[17px] outline-none",
+                isImageMode ? "text-purple-600 dark:text-purple-400" : "text-stone-400 dark:text-stone-500",
                 !expanded ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-105 translate-y-1 pointer-events-none"
               )}
               aria-label="Open prompt input"
             >
-              {placeholder}
+              {isImageMode ? "🎨 Görsel Üretim Modu Aktif (yazın...)" : placeholder}
             </button>
 
             <div
@@ -907,6 +916,27 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               >
                 <DynamicBarsIcon level={efforts[effortIndex]} />
                 <span className="text-xs font-semibold select-none transition-colors"><MorphingText text={efforts[effortIndex]} /></span>
+              </button>
+
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleImageMode?.();
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-all duration-200 outline-none cursor-pointer",
+                  isImageMode
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/25 ring-1 ring-purple-400/50"
+                    : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800"
+                )}
+                title={isImageMode ? "Görsel Modu Aktif (Kapatmak için tıkla)" : "Görsel Üretim Modunu Aç (Promptlar otomatik İngilizceye çevrilir)"}
+              >
+                <Sparkles className={cn("size-3.5", isImageMode ? "text-amber-300 animate-pulse" : "text-purple-500")} />
+                <span className="text-xs select-none">
+                  {isImageMode ? "Görsel Modu" : "Görsel"}
+                </span>
               </button>
 
               {attachPopoverNode ? (

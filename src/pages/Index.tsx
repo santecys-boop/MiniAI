@@ -268,6 +268,7 @@ export default function Index() {
   const [agentCurrent, setAgentCurrent] = useState(0);
   const [activeQuestions, setActiveQuestions] = useState<ParsedQuestionItem[] | null>(null);
   const [githubContractOpen, setGithubContractOpen] = useState(false);
+  const [isImageMode, setIsImageMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -784,7 +785,7 @@ export default function Index() {
     const currentPrompt = (opts?.customPrompt !== undefined ? opts.customPrompt : input).trim();
     if (!currentPrompt && pendingAttachments.length === 0) return;
     const isFix = !!opts?.fix;
-    const isImageOnly = !!opts?.forceImage;
+    const isImageOnly = !!opts?.forceImage || isImageMode;
     if (isFix && !code) {
       toast.error("Düzeltilecek kod yok — önce bir site üret.");
       return;
@@ -800,6 +801,7 @@ export default function Index() {
     setBusy(true);
 
     if (isImageOnly) {
+      setIsImageMode(false);
       const userMsg: Msg = { role: "user", chat: `🎨 Görsel Üret: ${currentPrompt}`, attachments: pendingAttachments };
       setMessages(m => [...m, userMsg]);
       log("info", `📤 🎨 Görsel Üret: ${currentPrompt.slice(0, 60)}`);
@@ -818,8 +820,12 @@ export default function Index() {
       setPendingAttachments([]);
 
       try {
+        const { translateAndEnhanceImagePrompt } = await import("../utils/imagePromptTranslator");
+        const enhancedEnglishPrompt = await translateAndEnhanceImagePrompt(promptToGen);
+        log("ai", `🌐 Prompt İngilizceye Çevrildi & Optimize Edildi: "${enhancedEnglishPrompt.slice(0, 60)}..."`);
+
         const { generateImageWithStableHorde } = await import("../lib/stableHordeService");
-        const imgUrl = await generateImageWithStableHorde(promptToGen);
+        const imgUrl = await generateImageWithStableHorde(enhancedEnglishPrompt);
         
         let savedSiteId: string | undefined = undefined;
         if (user?.id) {
@@ -1233,36 +1239,41 @@ export default function Index() {
              }
              return msg;
          }));
-         generateImageWithStableHorde(aiImagePrompt).then(imgUrl => {
-            setMessages(m => m.map(msg => {
-                if (msg === newMsg) {
-                    return {
-                        ...msg,
-                        chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n![Oluşturulan Görsel](${imgUrl})` : `![Oluşturulan Görsel](${imgUrl})`,
-                        imageGenPrompt: aiImagePrompt,
-                        imageGenStatus: "completed",
-                        imageGenUrl: imgUrl,
-                        attachments: [...(msg.attachments || []), { kind: "image", name: "generated.png", data: imgUrl }]
-                    };
-                }
-                return msg;
-            }));
-            log("success", "✅ Görsel üretimi tamamlandı");
-         }).catch(imgErr => {
-            setMessages(m => m.map(msg => {
-                if (msg === newMsg) {
-                    return {
-                        ...msg,
-                        chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n⚠️ Görsel oluşturulamadı: ${imgErr.message}` : `⚠️ Görsel oluşturulamadı: ${imgErr.message}`,
-                        imageGenPrompt: aiImagePrompt,
-                        imageGenStatus: "failed",
-                        imageGenError: imgErr.message,
-                    };
-                }
-                return msg;
-            }));
-            log("error", `❌ Görsel üretim hatası: ${imgErr.message}`);
-         });
+         (async () => {
+           try {
+             const { translateAndEnhanceImagePrompt } = await import("../utils/imagePromptTranslator");
+             const enhancedPrompt = await translateAndEnhanceImagePrompt(aiImagePrompt);
+             const imgUrl = await generateImageWithStableHorde(enhancedPrompt);
+             setMessages(m => m.map(msg => {
+                 if (msg === newMsg) {
+                     return {
+                         ...msg,
+                         chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n![Oluşturulan Görsel](${imgUrl})` : `![Oluşturulan Görsel](${imgUrl})`,
+                         imageGenPrompt: aiImagePrompt,
+                         imageGenStatus: "completed",
+                         imageGenUrl: imgUrl,
+                         attachments: [...(msg.attachments || []), { kind: "image", name: "generated.png", data: imgUrl }]
+                     };
+                 }
+                 return msg;
+             }));
+             log("success", "✅ Görsel üretimi tamamlandı");
+           } catch (imgErr: any) {
+             setMessages(m => m.map(msg => {
+                 if (msg === newMsg) {
+                     return {
+                         ...msg,
+                         chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n⚠️ Görsel oluşturulamadı: ${imgErr.message}` : `⚠️ Görsel oluşturulamadı: ${imgErr.message}`,
+                         imageGenPrompt: aiImagePrompt,
+                         imageGenStatus: "failed",
+                         imageGenError: imgErr.message,
+                     };
+                 }
+                 return msg;
+             }));
+             log("error", `❌ Görsel üretim hatası: ${imgErr.message}`);
+           }
+         })();
       }
       if (!isUnlimited()) spendDailyCredit();
       log("success", parsed.projectFiles ? `✅ Dosya(lar) üretildi (${parsed.projectFiles.length} dosya)` : parsed.code ? `✅ Kod üretildi (${parsed.code.length} karakter)` : `💬 Sohbet cevabı`);
@@ -1708,6 +1719,8 @@ export default function Index() {
             imageInputRef={imageInputRef}
             cameraInputRef={cameraInputRef}
             openPricing={() => setPricingOpen(true)}
+            isImageMode={isImageMode}
+            setIsImageMode={setIsImageMode}
           />
         </aside>
       </div>
