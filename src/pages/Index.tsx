@@ -792,10 +792,10 @@ export default function Index() {
     }
 
     const lower = input.toLowerCase();
-    const explicitAutomation = !isFix && !isImageOnly && /\b(api|server|sunucu|backend|express|node\.?js|fastify|npm install|endpoint|rest api|crud api|websocket|grpc|cli|otomasyon|sandbox|vm|e2b)\b/.test(lower);
+    const explicitAutomation = !isFix && !isImageOnly && /\b(terminal|linux|bash|otomasyon|vm|e2b)\b/.test(lower);
     const wantsSite = !isFix && !isImageOnly && /\b(site|sayfa|page|landing|portfolyo|portfolio|uygulama|app|web ?site|tasarla|tasarım|yap bana|bana .* yap|oluştur|build|create)\b/.test(lower);
-    const shouldUseE2B = !isFix && (explicitAutomation || wantsSite);
-    const useAgent = !isFix && wantsSite;
+    const shouldUseE2B = false;
+    const useAgent = false;
 
     const uploadedFile = !isFix ? pendingAttachments.find(a => a.kind === "file") : undefined;
     const isZip = !!uploadedFile && /\.zip$/i.test(uploadedFile.name);
@@ -805,7 +805,7 @@ export default function Index() {
     const userMsg: Msg = { role: "user", chat: isFix ? `🔧 Düzelt: ${input}` : isImageOnly ? `🎨 Görsel Üret: ${input}` : input, attachments: pendingAttachments };
     setMessages(m => [...m, userMsg]);
     log("info", `📤 ${isFix ? "🔧 Düzeltme: " : isImageOnly ? "🎨 Görsel Üret: " : ""}${input.slice(0, 60) || "(sadece ek)"}`);
-    log("ai", isImageOnly ? "🎨 Görsel tasarlanıyor..." : shouldUseE2B ? "🤖 E2B gerçek sandbox + Mini AI ajan başlıyor..." : useAgent ? "🤖 Ajan: 3 model paralel çalışıyor..." : "🤖 Mini AI düşünüyor...");
+    log("ai", isImageOnly ? "🎨 Görsel tasarlanıyor..." : "⚡ Mini AI düşünüyor...");
 
     const aiHistory = messages.filter(m => m.chat || m.code).map(m => ({
       role: m.role, content: m.chat || (m.code ? `[Önceki kod: ${m.codeType}]` : ""),
@@ -946,73 +946,57 @@ export default function Index() {
         promptToSend = `${fileBlocks}\n\n${input}`;
       }
 
-      if (useAgent) {
-        const r = await fetch(`${FN_BASE}/agent-mode`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({ prompt: promptToSend, systemPrompt: systemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
-        });
-        const data = await r.json();
-        if (data.error) throw new Error(data.error);
-        log("success", `🏆 Jüri seçti: Aday #${data.winner} — ${data.reason}`);
-        allCandidates = data.candidates;
-        const winnerText = data.candidates.find((c: any) => c.idx === data.winner)?.text || data.candidates[0].text;
-        parsed = parseAIResponse(winnerText, textFiles[0]?.name);
-        setAgentAlts(data.candidates);
-        setAgentCurrent(data.winner - 1);
-      } else {
-        let aiTextResponse = "";
+      let aiTextResponse = "";
 
-        // Doğrudan Çoklu Anahtarlı Yüksek Hızlı Motor (SiliconFlow 4 Key + LLM7 4 Key)
-        try {
-          const chatMsgs: AIMessage[] = [
-            { role: "system", content: systemPrompt },
-            ...aiHistory.map((h: any) => ({ role: h.role as "user" | "assistant", content: typeof h.content === "string" ? h.content : JSON.stringify(h.content) })),
-            { role: "user", content: promptToSend }
-          ];
+      // Doğrudan Çoklu Anahtarlı Yüksek Hızlı Motor (LLM7.io / SiliconFlow)
+      try {
+        const chatMsgs: AIMessage[] = [
+          { role: "system", content: systemPrompt },
+          ...aiHistory.map((h: any) => ({ role: h.role as "user" | "assistant", content: typeof h.content === "string" ? h.content : JSON.stringify(h.content) })),
+          { role: "user", content: promptToSend }
+        ];
 
-          const providerResult = await executeMultiProviderChat(
-            chatMsgs,
-            model
-          );
+        const providerResult = await executeMultiProviderChat(
+          chatMsgs,
+          model
+        );
 
-          if (providerResult.text) {
-            aiTextResponse = providerResult.text;
-            log("ai", "⚡ Mini AI yanıt üretti.");
-          }
-        } catch (directErr) {
-          console.warn("Direct multi-provider error, trying fallback...", directErr);
+        if (providerResult.text) {
+          aiTextResponse = providerResult.text;
+          log("ai", "⚡ Mini AI yanıt üretti.");
         }
-
-        // Eğer doğrudan çağrı başarısız olduysa backend'den dene
-        if (!aiTextResponse || aiTextResponse === "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.") {
-          try {
-            const resp = await fetch(`${FN_BASE}/generate-site`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-              body: JSON.stringify({
-                prompt: promptToSend, history: aiHistory, images: imgs,
-                attachedFile: file ? { name: file.name, content: file.data } : null,
-                preferredProvider: model,
-                systemPrompt: systemPrompt,
-                onlineCompilerKey: ONLINE_COMPILER_API_KEY,
-                ...(isFix ? { fixError: input, currentCode: code } : {}),
-              }),
-            });
-            const data = await resp.json();
-            if (data.text) aiTextResponse = data.text;
-          } catch (fbErr) {
-            console.error("Fallback failed", fbErr);
-          }
-        }
-
-        if (!aiTextResponse) {
-          aiTextResponse = "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.";
-        }
-
-        parsed = parseAIResponse(aiTextResponse, textFiles[0]?.name);
-        setAgentAlts(null);
+      } catch (directErr) {
+        console.warn("Direct multi-provider error, trying fallback...", directErr);
       }
+
+      // Eğer doğrudan çağrı başarısız olduysa backend'den dene
+      if (!aiTextResponse || aiTextResponse === "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.") {
+        try {
+          const resp = await fetch(`${FN_BASE}/generate-site`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
+            body: JSON.stringify({
+              prompt: promptToSend, history: aiHistory, images: imgs,
+              attachedFile: file ? { name: file.name, content: file.data } : null,
+              preferredProvider: model,
+              systemPrompt: systemPrompt,
+              onlineCompilerKey: ONLINE_COMPILER_API_KEY,
+              ...(isFix ? { fixError: input, currentCode: code } : {}),
+            }),
+          });
+          const data = await resp.json();
+          if (data.text) aiTextResponse = data.text;
+        } catch (fbErr) {
+          console.error("Fallback failed", fbErr);
+        }
+      }
+
+      if (!aiTextResponse) {
+        aiTextResponse = "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.";
+      }
+
+      parsed = parseAIResponse(aiTextResponse, textFiles[0]?.name);
+      setAgentAlts(null);
       const projApiKey = generateProjectApiKey();
       
       let processedFiles = parsed.projectFiles;
