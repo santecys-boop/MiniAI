@@ -951,6 +951,11 @@ export default function Index() {
         promptToSend = `${fileBlocks}\n\n${input}`;
       }
 
+      const isAppOrSaaSRequest = /\b(uygulama|app|saas|panel|dashboard|platform|site|yazılım|tool|sistem|proje|tasarla|oluştur|yap|seçimlerim|tercihlerim)\b/i.test(lower);
+      if (isAppOrSaaSRequest && !isFix) {
+        promptToSend = `${promptToSend}\n\n[MİMARİ DİREKTİFİ: Lütfen basit bir HTML şablonu/tek index sayfası yerine; Lovable.dev kalitesinde, çok sekmeli/görünümlü (Dashboard/Özet, Ana Veri/İşlemler Listesi, Detay & Ekleme Modalları, Analitik Grafikler, Ayarlar), tam CRUD işlemlerine ve localStorage hafızasına sahip, zengin Tailwind CSS ve Lucide ikonlu, canlı çalışan eksiksiz bir SaaS web uygulamasını tek parça \`\`\`html ... \`\`\` bloğunda üret!]`;
+      }
+
       let aiTextResponse = "";
 
       // Doğrudan Çoklu Anahtarlı Yüksek Hızlı Motor (LLM7.io / SiliconFlow)
