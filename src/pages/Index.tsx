@@ -46,6 +46,9 @@ import { DatabaseSchemaViewer } from "../components/DatabaseSchemaViewer";
 import { unlockAudioEngine } from "@/services/neuralVoiceService";
 import { MultiFileSandboxPreview } from "../components/MultiFileSandboxPreview";
 import { executeMultiProviderChat, AIMessage } from "../services/aiProviderService";
+import { performDuckDuckGoSearch, formatSearchResultsForAI } from "../services/webSearchService";
+import { parseAIToolCalls, ParsedQuestionItem } from "../utils/aiToolParser";
+import { InteractiveQuestionsWidget } from "../components/InteractiveQuestionsWidget";
 
 const GOOGLE_CLIENT_ID = "930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.googleusercontent.com";
 
@@ -254,6 +257,7 @@ export default function Index() {
   const [apiCodeLang, setApiCodeLang] = useState<"python" | "js" | "curl">("python");
   const [agentAlts, setAgentAlts] = useState<{ idx: number; text: string }[] | null>(null);
   const [agentCurrent, setAgentCurrent] = useState(0);
+  const [activeQuestions, setActiveQuestions] = useState<ParsedQuestionItem[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -996,6 +1000,47 @@ export default function Index() {
         aiTextResponse = "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.";
       }
 
+      // ── Web Arama & Etkileşimli Soru Ayrıştırma ──
+      const initialToolCalls = parseAIToolCalls(aiTextResponse);
+
+      // 1. DuckDuckGo Web Arama Aracı
+      if (initialToolCalls.webSearchQuery) {
+        log("ai", `🔍 Web Arama: "${initialToolCalls.webSearchQuery}" taranıyor...`);
+        toast.info(`🔍 DuckDuckGo: "${initialToolCalls.webSearchQuery}" aranıyor...`);
+        try {
+          const searchResults = await performDuckDuckGoSearch(initialToolCalls.webSearchQuery);
+          log("success", `🌐 DuckDuckGo: ${searchResults.length} sonuç bulundu.`);
+          const formattedResults = formatSearchResultsForAI(initialToolCalls.webSearchQuery, searchResults);
+
+          const searchFollowUpMsgs: AIMessage[] = [
+            { role: "system", content: systemPrompt },
+            ...aiHistory.map((h: any) => ({ role: h.role as "user" | "assistant", content: typeof h.content === "string" ? h.content : JSON.stringify(h.content) })),
+            { role: "user", content: promptToSend },
+            { role: "assistant", content: aiTextResponse },
+            { role: "user", content: `${formattedResults}\n\nLütfen yukarıdaki en güncel arama sonuçlarını kullanarak kullanıcının isteğine doğrudan ve eksiksiz cevap ver.` }
+          ];
+
+          const secondPass = await executeMultiProviderChat(searchFollowUpMsgs, model);
+          if (secondPass.text) {
+            aiTextResponse = secondPass.text;
+            log("ai", "⚡ Mini AI arama sonuçlarıyla güncel yanıt üretti.");
+          }
+        } catch (searchErr: any) {
+          console.warn("Web search follow-up error:", searchErr);
+        }
+      }
+
+      // 2. Etkileşimli Soru-Cevap (ask_user_input_v0)
+      const finalToolCheck = parseAIToolCalls(aiTextResponse);
+      if (finalToolCheck.questions && finalToolCheck.questions.length > 0) {
+        setActiveQuestions(finalToolCheck.questions);
+        log("ai", `📋 Mini AI ${finalToolCheck.questions.length} adet etkileşimli soru yöneltti.`);
+      }
+
+      if (finalToolCheck.cleanText) {
+        aiTextResponse = finalToolCheck.cleanText;
+      }
+
       parsed = parseAIResponse(aiTextResponse, textFiles[0]?.name);
       setAgentAlts(null);
       const projApiKey = generateProjectApiKey();
@@ -1486,6 +1531,20 @@ export default function Index() {
               onVideoClick={(url) => setPreviewVideoUrl(url)}
             />
           </ScrollArea>
+
+          {activeQuestions && activeQuestions.length > 0 && (
+            <InteractiveQuestionsWidget
+              questions={activeQuestions}
+              onComplete={(responseSummary) => {
+                setActiveQuestions(null);
+                setInput(responseSummary);
+                setTimeout(() => {
+                  send();
+                }, 100);
+              }}
+              onDismiss={() => setActiveQuestions(null)}
+            />
+          )}
 
           <ChatBottomBar
             input={input}
