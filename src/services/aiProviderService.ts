@@ -1,5 +1,5 @@
 // Mini AI Stealth Provider Service
-// Exclusively Powered by LLM7.io Multi-Key Vault Engine
+// Exclusively Powered by LLM7.io Multi-Key Vault Engine & High-Availability Supabase Fallback
 // Features: Multimodal Vision (Image Analysis), 4 Encrypted Vault Keys, Smart Model Routing (Fast / Pro).
 
 export interface AIMessageContentPart {
@@ -31,8 +31,8 @@ function _dec(encoded: string, key = 42): string {
 // 4 Obfuscated LLM7.io Vault Keys (AES-XOR Stealth Storage)
 const _V1 = [
   "fxNwf2lJeQVmAU9cYhxOHnABYGFQGXtMGRwFY1pkRBlSTl5SYW8cSWBmb1ABR0JtGk5bb2RLQ2R7ZQVFTR9OYU5iR3hoQkd+TxxIY0ZEXxNEbWNTfFtpZBxYYkxncxhBHmZyRVpkb3BDRVBHQmZ4EmJvWX5DaVhpUFtCcE1zY0VocmVQWB1OSURZE0xMQRIX",
-  "Rlp9QmNpW1hEXWF8UBJAckNmeF1eHmFHG01fUF5bbmcdc3BEE2Nabh94HwFnHR1kSBNyYl9BTXJLHk9zBVgbRGVsa0BwYl9MekAfT2dkARpoHERmBU9raWhLe1IaHx9gTW5rT29YRBt9Whx/Z0NIHXhET1pFHm1zTUQYZBxMU1BnYHtwe2EZcmBEUwUTfxp5bWsXFw==",
   "EkR4W1IdSwVuZHpAEkh5HWl/Un8aa0hlcHAceEhoSVtFa0MaaFtzG3tHbnp7cmJdZlhjHmQSE0dSf0xrR35YH0RycGxEf0dGYn99aW5rRFxoWm9eR3tZSGx5bEZ9aH4aWGQcHEtCc3JHHlscZV1PRX9nE3tQH2BDZH0Fc2BcExMScmRaZEASS2NaUGRAUBJL",
+  "Rlp9QmNpW1hEXWF8UBJAckNmeF1eHmFHG01fUF5bbmcdc3BEE2Nabh94HwFnHR1kSBNyYl9BTXJLHk9zBVgbRGVsa0BwYl9MekAfT2dkARpoHERmBU9raWhLe1IaHx9gTW5rT29YRBt9Whx/Z0NIHXhET1pFHm1zTUQYZBxMU1BnYHtwe2EZcmBEUwUTfxp5bWsXFw==",
   "TX1dYmVybFt8ZFxoY2VZYktMYwEcZUgaGUloZm1cS1tneUAfYm5SW2NPcGJGYmd+YWJ9SGNbZxtSE0ZOZmwaf3B9aBJCX1NkbHlfTh0bWVAfXGZAHHobHmxMWGNfXlpTR1p+X2sFSEIcb1xbf2VhRFIYSR5SG2gZZmdwZgFDXHMeH11LG2JbeE1+GkhAbE1SZ2lvTW5NFxc="
 ];
 
@@ -55,14 +55,14 @@ const PRO_MODELS = [
 
 export interface AIResponseResult {
   text: string;
-  provider: "llm7";
+  provider: "llm7" | "supabase" | "fallback";
   model: string;
   keyIndex: number;
 }
 
 let llm7Cursor = 0;
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 15000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 25000): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -78,7 +78,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 1
 export async function callLLM7(
   messages: AIMessage[],
   mode: "fast" | "pro" = "fast",
-  timeoutMs = 8500
+  timeoutMs = 25000
 ): Promise<AIResponseResult> {
   const totalKeys = _V1.length;
   const endpoint = _dec(_E1);
@@ -104,6 +104,11 @@ export async function callLLM7(
           }),
         }, timeoutMs);
 
+        if (res.status === 429) {
+          // Bu anahtarın kotası dolmuş, diğer anahtara geç
+          break;
+        }
+
         if (res.ok) {
           const data = await res.json();
           const reply = data.choices?.[0]?.message?.content;
@@ -118,7 +123,7 @@ export async function callLLM7(
           }
         }
       } catch (_) {
-        // Hata durumunda bir sonraki model veya anahtara geç
+        // Zaman aşımı veya ağ hatasında bir sonraki modele / anahtara geç
       }
     }
   }
@@ -130,7 +135,7 @@ export async function executeMultiProviderChat(
   chosenModel?: string
 ): Promise<AIResponseResult> {
   const mode = chosenModel === "pro" ? "pro" : "fast";
-  const timeout = mode === "pro" ? 30000 : 18000;
+  const timeout = mode === "pro" ? 30000 : 25000;
 
   try {
     const res = await callLLM7(messages, mode, timeout);
@@ -138,21 +143,57 @@ export async function executeMultiProviderChat(
       return res;
     }
   } catch (err) {
-    console.warn("LLM7 Primary Attempt failed, attempting fallback key rotation...", err);
+    console.warn("LLM7 Primary Attempt failed, attempting fallback...", err);
     try {
-      const fallbackRes = await callLLM7(messages, mode === "pro" ? "fast" : "pro", 22000);
+      const fallbackRes = await callLLM7(messages, mode === "pro" ? "fast" : "pro", 25000);
       if (fallbackRes && fallbackRes.text && fallbackRes.text.trim().length > 0) {
         return fallbackRes;
       }
     } catch (finalErr) {
-      console.error("All LLM7 attempts failed:", finalErr);
+      console.error("All LLM7 attempts failed, checking edge fallback:", finalErr);
     }
   }
 
+  // Supabase Edge Function Fallback
+  try {
+    const supabaseUrl = import.meta.env.VITE_AI_SUPABASE_URL || "https://dhryhmkhdelwuzowyjbo.supabase.co";
+    const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+    const promptText = typeof messages[messages.length - 1]?.content === "string" 
+      ? messages[messages.length - 1].content as string
+      : "Merhaba";
+
+    const edgeRes = await fetch(`${supabaseUrl}/functions/v1/generate-site`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${anonKey}`,
+        "apikey": anonKey
+      },
+      body: JSON.stringify({
+        prompt: promptText,
+        systemPrompt: typeof messages[0]?.content === "string" ? messages[0].content : undefined
+      })
+    });
+
+    if (edgeRes.ok) {
+      const edgeData = await edgeRes.json();
+      if (edgeData.html || edgeData.code || edgeData.text) {
+        return {
+          text: edgeData.html || edgeData.code || edgeData.text,
+          provider: "supabase",
+          model: "Mini AI Cloud",
+          keyIndex: 1
+        };
+      }
+    }
+  } catch (edgeErr) {
+    console.error("Edge fallback error:", edgeErr);
+  }
+
   return {
-    text: "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.",
-    provider: "llm7",
-    model: "Mini AI",
+    text: "Merhaba! İsteğiniz alındı. Yapay zeka servislerimiz şu anda yoğun talep altında olabilir, lütfen sorunuzu tekrar iletiniz.",
+    provider: "fallback",
+    model: "Mini AI Asistan",
     keyIndex: 0,
   };
 }

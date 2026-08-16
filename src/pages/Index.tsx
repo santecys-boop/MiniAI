@@ -1043,7 +1043,7 @@ export default function Index() {
       }
 
       // Eğer doğrudan çağrı başarısız olduysa backend'den dene
-      if (!aiTextResponse || aiTextResponse === "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.") {
+      if (!aiTextResponse) {
         try {
           const resp = await fetch(`${FN_BASE}/generate-site`, {
             method: "POST",
@@ -1065,7 +1065,7 @@ export default function Index() {
       }
 
       if (!aiTextResponse) {
-        aiTextResponse = "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.";
+        aiTextResponse = "İsteğiniz başarıyla alındı ancak yapay zeka servisi geçici olarak meşgul. Lütfen tekrar deneyiniz.";
       }
 
       // ── Web Arama & Etkileşimli Soru Ayrıştırma (Eğer Önceden Yapılmadıysa) ──
