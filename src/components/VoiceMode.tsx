@@ -43,6 +43,12 @@ import { X, Mic, Plus, Check, ArrowUp, Volume2, Pause } from "lucide-react";
 import { toast } from "sonner";
 import { getCredits, spendCredit, isUnlimited } from "@/lib/credits";
 import { executeMultiProviderChat, AIMessage } from "@/services/aiProviderService";
+import {
+  synthesizeNeuralAudio,
+  NEURAL_VOICES,
+  splitSpeechChunks,
+  NeuralVoiceDef,
+} from "@/services/neuralVoiceService";
 
 /* ════════════════════════════════════════════════════════════════════════════
  *  SABİTLER & TİPLER
@@ -55,59 +61,8 @@ type Msg = { role: "user" | "assistant"; content: string; at: number };
 
 type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "muted";
 
-interface VoiceDef {
-  id: string;
-  name: string;
-  desc: string;
-  tone: string;       // panelde renk noktası
-  preview: string;    // önizleme cümlesi
-}
-
-/** 6 OpenAI TTS sesi (düşük gecikme için tts-1 modeliyle kullanılır) */
-const VOICES: VoiceDef[] = [
-  {
-    id: "shimmer",
-    name: "Shimmer",
-    desc: "Parlak, enerjik ve genç kadın sesi",
-    tone: "#f59eb5",
-    preview: "Merhaba! Ben Shimmer. Enerjik ve parlak bir sesim var.",
-  },
-  {
-    id: "nova",
-    name: "Nova",
-    desc: "Sıcak, doğal ve samimi kadın sesi",
-    tone: "#f6b26b",
-    preview: "Merhaba, ben Nova. Sıcak ve doğal bir tonda konuşurum.",
-  },
-  {
-    id: "alloy",
-    name: "Alloy",
-    desc: "Dengeli, nötr ve profesyonel ses",
-    tone: "#8ea2f5",
-    preview: "Merhaba, ben Alloy. Dengeli ve net bir sesim var.",
-  },
-  {
-    id: "echo",
-    name: "Echo",
-    desc: "Derin, sakin ve güven veren erkek sesi",
-    tone: "#6fc7b2",
-    preview: "Merhaba, ben Echo. Sakin ve derin bir tonla konuşurum.",
-  },
-  {
-    id: "onyx",
-    name: "Onyx",
-    desc: "Güçlü, otoriter ve tok erkek sesi",
-    tone: "#5b6478",
-    preview: "Merhaba, ben Onyx. Güçlü ve tok bir sesim var.",
-  },
-  {
-    id: "fable",
-    name: "Fable",
-    desc: "Hikâye anlatıcısı, İngiliz aksanlı ses",
-    tone: "#b78ef0",
-    preview: "Merhaba, ben Fable. Hikâye anlatmayı çok severim.",
-  },
-];
+export type VoiceDef = NeuralVoiceDef;
+export const VOICES = NEURAL_VOICES;
 
 const LS_VOICE_KEY = "voice-mode-voice";
 const LS_SPEED_KEY = "voice-mode-speed";
@@ -896,6 +851,8 @@ export default function VoiceMode({
   const smoothLevelRef = useRef(0);
   const busyRef = useRef(false);       // STT/Chat/TTS zinciri çalışıyor mu
   const closedRef = useRef(false);     // bileşen kapandı mı
+  const recognitionRef = useRef<any>(null);
+  const speechTranscriptRef = useRef<string>("");
 
   /* En güncel değerlere ref üzerinden erişim (stale closure önlemi) */
   const voiceRef = useRef(voice);
@@ -923,6 +880,14 @@ export default function VoiceMode({
     abortRef.current?.abort();
     abortRef.current = null;
     try {
+      if (recognitionRef.current) {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
+    } catch { /* geç */ }
+    try {
       if (recRef.current?.state === "recording") {
         recRef.current.onstop = null; // handleAudio tetiklenmesin
         recRef.current.stop();
@@ -945,13 +910,41 @@ export default function VoiceMode({
     busyRef.current = false;
     setState("idle");
     setLevel(0);
-    setCaption("");
     setPreviewingId(null);
   }, []);
 
   /* ══════════════════════════════════════════════════════════════════════
-   *  KAYIT BAŞLATMA / YENİDEN BAŞLATMA
+   *  KAYIT BAŞLATMA / YENİDEN BAŞLATMA & CANLI KONUŞMA TANIMA
    * ════════════════════════════════════════════════════════════════════ */
+
+  const initSpeechRecognition = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    try {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* geç */ }
+      }
+      const r = new SR();
+      r.continuous = true;
+      r.interimResults = true;
+      r.lang = "tr-TR";
+      r.onresult = (e: any) => {
+        let full = "";
+        for (let i = 0; i < e.results.length; i++) {
+          full += e.results[i][0].transcript + " ";
+        }
+        if (full.trim()) {
+          speechTranscriptRef.current = full.trim();
+        }
+      };
+      r.onerror = () => {};
+      r.start();
+      recognitionRef.current = r;
+    } catch (e) {
+      console.warn("SpeechRecognition init warning:", e);
+    }
+  }, []);
 
   const attachRecorder = useCallback((stream: MediaStream) => {
     const rec = new MediaRecorder(stream, {
@@ -968,14 +961,16 @@ export default function VoiceMode({
     silenceStartRef.current = null;
     speechStartRef.current = null;
     utteranceStartRef.current = performance.now();
+    initSpeechRecognition();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initSpeechRecognition]);
 
   const restartRecording = useCallback(() => {
     if (closedRef.current || !streamRef.current) return;
     try { playerRef.current?.pause(); } catch { /* geç */ }
     playerRef.current = null;
     busyRef.current = false;
+    speechTranscriptRef.current = "";
     attachRecorder(streamRef.current);
     setState("listening");
     startVadLoop();
@@ -1140,40 +1135,28 @@ export default function VoiceMode({
   /** Kaydedilen sesi yazıya çevir, cevap üret, seslendir */
   async function handleAudio() {
     if (closedRef.current) return;
+
+    const userText = speechTranscriptRef.current.trim();
+    speechTranscriptRef.current = "";
+
     const mime = recRef.current?.mimeType || "audio/webm";
     const blob = new Blob(chunksRef.current, { type: mime });
     chunksRef.current = [];
 
-    if (blob.size < VAD.MIN_BLOB_BYTES) {
+    if (!userText && blob.size < VAD.MIN_BLOB_BYTES) {
+      restartRecording();
+      return;
+    }
+
+    if (!userText) {
       restartRecording();
       return;
     }
 
     setState("thinking");
-    setCaption("");
     haptic(8);
 
     try {
-      /* ── 1) STT — sesi yazıya çevir ── */
-      const ac = new AbortController();
-      abortRef.current = ac;
-      const fd = new FormData();
-      fd.append("file", blob, mime.includes("mp4") ? "voice.mp4" : "voice.webm");
-      fd.append("language", "tr");
-      const sttR = await fetch(`${FN_BASE}/voice-stt`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${ANON}`, apikey: ANON },
-        body: fd,
-        signal: ac.signal,
-      });
-      if (!sttR.ok) throw new Error(`stt-${sttR.status}`);
-      const sttJ = await sttR.json();
-      const userText = (sttJ.text || "").trim();
-      if (!userText || userText.length < 2) {
-        restartRecording();
-        return;
-      }
-
       await converse(userText);
     } catch (err) {
       if ((err as Error)?.name === "AbortError") return;
@@ -1274,25 +1257,7 @@ export default function VoiceMode({
 
   /** Bir metin parçasının TTS sesini indir, object URL döndür */
   async function fetchTtsUrl(text: string, signal: AbortSignal): Promise<string> {
-    const ttsR = await fetch(`${FN_BASE}/voice-tts`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${ANON}`,
-        apikey: ANON,
-      },
-      body: JSON.stringify({
-        text,
-        voice: voiceRef.current,
-        model: "tts-1", // hd yerine standart model — çok daha düşük gecikme
-        speed: speedRef.current,
-        response_format: "mp3",
-      }),
-      signal,
-    });
-    if (!ttsR.ok) throw new Error(`tts-${ttsR.status}`);
-    const buf = await ttsR.arrayBuffer();
-    return URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+    return await synthesizeNeuralAudio(text, voiceRef.current, speedRef.current, signal);
   }
 
   /** Bir object URL'i çal; bitince/hata olunca/iptal edilince resolve olur */
@@ -1350,13 +1315,13 @@ export default function VoiceMode({
 
   /**
    * Metni seslendir; bitince onDone çağrılır.
-   * OpenAI TTS motoru (tts-1 / Shimmer, Nova, Alloy, Echo, Onyx, Fable) ile seslendirilir.
+   * ElevenLabs kalitesinde Neural Speech motoru ile seslendirilir.
    */
   async function speak(text: string, onDone: () => void) {
     const ac = new AbortController();
     abortRef.current = ac;
 
-    const chunks = splitForTts(text);
+    const chunks = splitSpeechChunks(text, 180);
 
     try {
       /* Tüm parçaları paralel indir — sıra playback'te korunur */
@@ -1372,7 +1337,7 @@ export default function VoiceMode({
         await playUrl(url, ac.signal);
       }
     } catch (err) {
-      console.warn("OpenAI TTS playback error:", err);
+      console.warn("Neural voice playback error:", err);
     }
 
     if (!closedRef.current && !ac.signal.aborted) onDone();
@@ -1427,24 +1392,7 @@ export default function VoiceMode({
     try { previewPlayerRef.current?.pause(); } catch { /* geç */ }
     setPreviewingId(v.id);
     try {
-      const r = await fetch(`${FN_BASE}/voice-tts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${ANON}`,
-          apikey: ANON,
-        },
-        body: JSON.stringify({
-          text: v.preview,
-          voice: v.id,
-          model: "tts-1",
-          speed: 1,
-          response_format: "mp3",
-        }),
-      });
-      if (!r.ok) throw new Error("preview");
-      const buf = await r.arrayBuffer();
-      const url = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+      const url = await synthesizeNeuralAudio(v.preview, v.id, 1);
       const audio = new Audio(url);
       previewPlayerRef.current = audio;
       const done = () => {
