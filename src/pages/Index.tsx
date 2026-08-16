@@ -1060,8 +1060,21 @@ export default function Index() {
       let newMemory = memoryMatch ? memoryMatch[1].trim() : null;
 
       let finalChat = parsed.chat;
-      if (finalChat) finalChat = finalChat.replace(/[*~]/g, "");
-      
+      if (finalChat) {
+        finalChat = finalChat
+          .replace(/[*~]/g, "")
+          .replace(/<antml:[\s\S]*?<\/antml:[^>]+>/gi, "")
+          .replace(/<antml:[^>]+>/gi, "")
+          .replace(/<\/antml:[^>]+>/gi, "")
+          .replace(/<invoke[\s\S]*?<\/invoke>/gi, "")
+          .replace(/<parameter[\s\S]*?<\/parameter>/gi, "")
+          .trim();
+      }
+
+      if ((!finalChat || finalChat.trim().length === 0) && finalToolCheck.questions && finalToolCheck.questions.length > 0) {
+        finalChat = "✨ Uygulamanızı en iyi şekilde tasarlamak için aşağıdaki kısa anketi doldurabilir veya doğrudan başlatabilirsiniz:";
+      }
+
       if (aiImagePrompt) {
         finalChat = finalChat?.replace(/\[IMAGE_GEN\][\s\S]*?\[\/IMAGE_GEN\]/gi, "").trim();
         finalChat = (finalChat || "") + "\n\n✨ Görseliniz özenle tasarlanıyor...";
