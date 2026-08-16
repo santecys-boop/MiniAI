@@ -303,6 +303,7 @@ export interface PromptInputProps {
   onAttachClick?: (e: React.MouseEvent) => void;
   attachPopoverNode?: React.ReactNode;
   busy?: boolean;
+  onStop?: () => void;
 }
 
 export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
@@ -322,6 +323,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       onAttachClick,
       attachPopoverNode,
       busy = false,
+      onStop,
     },
     ref
   ) => {
@@ -576,28 +578,14 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     useEffect(() => {
       if (!textareaRef.current) return;
       const el = textareaRef.current;
-      
-      const currentHeight = el.style.height;
-      el.style.transition = 'none';
-      el.style.height = "0px";
+      el.style.height = "auto";
       const scrollHeight = el.scrollHeight;
-      el.style.height = currentHeight;
-      void el.offsetHeight; 
-      el.style.transition = '';
-      
       const newHeight = Math.max(68, Math.min(scrollHeight, 160));
       el.style.height = `${newHeight}px`;
-      
       setTextareaHeight(newHeight);
       setIsScrolling(scrollHeight > 160);
-      
-      setTimeout(updateFades, 0);
-    }, [value, expanded]); 
-
-    useEffect(() => {
-      setContainerHeight(Math.max(116, textareaHeight + 48));
-      setTimeout(updateFades, 0);
-    }, [textareaHeight]);
+      setContainerHeight(Math.max(116, newHeight + 48));
+    }, [value, expanded]);
 
     useEffect(() => {
       if (!isModelSelectOpen) return;
@@ -684,7 +672,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       if (isRecording) {
         stopRecording();
       } else if (busy) {
-        // Handled by parent
+        onStop?.();
       } else if (hasValue) {
         handleSubmit();
       } else {

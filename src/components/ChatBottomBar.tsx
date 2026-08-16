@@ -104,6 +104,7 @@ export function ChatBottomBar({
         onToggleMic={toggleMic}
         attachPopoverNode={attachPopover}
         busy={busy}
+        onStop={() => setBusy(false)}
         placeholder="Mesaj yazın veya konuşmak için dokunun..."
         models={["Mini AI Hızlı", "Mini AI Pro"]}
         efforts={["Low", "Medium", "Max Effort"]}

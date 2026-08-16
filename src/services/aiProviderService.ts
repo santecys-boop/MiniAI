@@ -70,7 +70,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 1
 export async function callLLM7(
   messages: AIMessage[],
   mode: "fast" | "pro" = "fast",
-  timeoutMs = 18000
+  timeoutMs = 7500
 ): Promise<AIResponseResult> {
   const totalKeys = _V1.length;
   const endpoint = _dec(_E1);
