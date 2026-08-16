@@ -44,6 +44,8 @@ export type Msg = {
   architecturePlan?: string;
   databaseQueries?: string[];
   effort?: "Low" | "Medium" | "Max Effort" | string;
+  webSearchQuery?: string;
+  webSearchSources?: { title: string; url: string; source: string; snippet?: string }[];
 };
 
 export type LogEntry = {

@@ -1008,12 +1008,17 @@ export default function Index() {
       // ── Web Arama & Etkileşimli Soru Ayrıştırma ──
       const initialToolCalls = parseAIToolCalls(aiTextResponse);
 
+      let capturedWebQuery: string | undefined = undefined;
+      let capturedWebSources: any[] | undefined = undefined;
+
       // 1. DuckDuckGo Web Arama Aracı
       if (initialToolCalls.webSearchQuery) {
+        capturedWebQuery = initialToolCalls.webSearchQuery;
         log("ai", `🔍 Web Arama: "${initialToolCalls.webSearchQuery}" taranıyor...`);
         toast.info(`🔍 DuckDuckGo: "${initialToolCalls.webSearchQuery}" aranıyor...`);
         try {
           const searchResults = await performDuckDuckGoSearch(initialToolCalls.webSearchQuery);
+          capturedWebSources = searchResults;
           log("success", `🌐 DuckDuckGo: ${searchResults.length} sonuç bulundu.`);
           const formattedResults = formatSearchResultsForAI(initialToolCalls.webSearchQuery, searchResults);
 
@@ -1098,6 +1103,8 @@ export default function Index() {
         role: "assistant", 
         ...parsed, 
         chat: finalChat,
+        webSearchQuery: capturedWebQuery,
+        webSearchSources: capturedWebSources,
         effort: opts?.effort || "Medium",
         agentCandidates: allCandidates,
         ...(parsed.code && parsed.codeType === "html" ? { code: injectAIBridge(parsed.code) } : {}),

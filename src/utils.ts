@@ -262,16 +262,49 @@ export function parseAIResponse(raw: string, attachedFileName?: string): FullSta
     const projTitle = titleMatch ? titleMatch[1].trim() : "Mini AI Web Projesi";
     const projSlug = projTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
+    const jsMatch = rawHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
+    const cssMatch = rawHtml.match(/<style[\s\S]*?>([\s\S]*?)<\/style>/i);
+    const appJsContent = jsMatch ? jsMatch[1].trim() : `// ${projTitle} - Main Application Logic\nconsole.log('${projTitle} initialized');`;
+    const cssContent = cssMatch ? cssMatch[1].trim() : `/* ${projTitle} - Global Styles */\n@tailwind base;\n@tailwind components;\n@tailwind utilities;`;
+
     const convertedFiles: ProjectFile[] = [
       {
         path: "index.html",
         content: rawHtml,
         lang: "html"
+      },
+      {
+        path: "src/App.tsx",
+        content: `// ════════════════════════════════════════════════════════════════════════════\n// ${projTitle} — Ana Uygulama Modülü\n// ════════════════════════════════════════════════════════════════════════════\nimport React from 'react';\n\nexport default function App() {\n  return (\n    <div className="min-h-screen bg-stone-950 text-stone-100 p-6">\n      <h1 className="text-2xl font-bold mb-4">${projTitle}</h1>\n      {/* Canlı etkileşimli içerik index.html önizlemesinde render edilmektedir */}\n    </div>\n  );\n}\n\n${appJsContent}`,
+        lang: "tsx"
+      },
+      {
+        path: "src/styles/globals.css",
+        content: cssContent,
+        lang: "css"
+      },
+      {
+        path: "package.json",
+        content: JSON.stringify({
+          name: projSlug,
+          version: "1.0.0",
+          private: true,
+          type: "module",
+          scripts: { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+          dependencies: { "react": "^18.3.1", "react-dom": "^18.3.1", "lucide-react": "^0.441.0", "clsx": "^2.1.1" },
+          devDependencies: { "@vitejs/plugin-react": "^4.3.1", "vite": "^5.4.2", "tailwindcss": "^3.4.10" }
+        }, null, 2),
+        lang: "json"
+      },
+      {
+        path: "README.md",
+        content: `# ${projTitle}\n\nMini AI tarafından Lovable kalitesinde üretilen modern web uygulaması ve SaaS platformu.\n\n## 🚀 Başlatma\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n`,
+        lang: "markdown"
       }
     ];
 
     return {
-      chat: `🚀 **${projTitle}** başarıyla oluşturuldu.`,
+      chat: `🚀 **${projTitle}** çoklu dosya mimarisi ve canlı önizlemesiyle başarıyla oluşturuldu.`,
       projectName: projSlug,
       projectFiles: convertedFiles,
       code: rawHtml,

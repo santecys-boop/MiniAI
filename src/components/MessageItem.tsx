@@ -148,6 +148,55 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
           </details>
         )}
 
+        {/* 🌐 Canlı Web Arama & İncelenen Kaynaklar Kartı */}
+        {m.webSearchSources && m.webSearchSources.length > 0 && (
+          <div className="mb-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50/90 dark:bg-stone-900/90 p-3 text-xs shadow-xs animate-in fade-in duration-200">
+            <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-stone-200/80 dark:border-stone-800">
+              <div className="flex items-center gap-1.5 font-semibold text-stone-800 dark:text-stone-200">
+                <Globe className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                <span>Web Arama Kaynakları</span>
+                {m.webSearchQuery && (
+                  <span className="text-stone-500 dark:text-stone-400 font-mono text-[11px] font-normal truncate max-w-[200px]">
+                    "{m.webSearchQuery}"
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full">
+                {m.webSearchSources.length} Kaynak
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+              {m.webSearchSources.map((source, sIdx) => {
+                let domain = "";
+                try { domain = new URL(source.url || "https://duckduckgo.com").hostname.replace(/^www\./, ""); } catch (_) { domain = "duckduckgo.com"; }
+                return (
+                  <a
+                    key={sIdx}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white dark:bg-stone-950/70 border border-stone-200/80 dark:border-stone-800/80 hover:border-blue-500/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all text-stone-700 dark:text-stone-300 group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      <div className="truncate">
+                        <p className="font-medium truncate text-[11.5px] text-stone-800 dark:text-stone-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {source.title}
+                        </p>
+                        <p className="text-[10px] text-stone-400 truncate">
+                          {source.source} • {domain}
+                        </p>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-3 h-3 text-stone-400 group-hover:text-blue-500 shrink-0" />
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="text-sm font-sans space-y-3">
           {m.attachments && m.attachments.length > 0 && !imageUrl && (
             <div className="flex flex-wrap gap-1.5">
