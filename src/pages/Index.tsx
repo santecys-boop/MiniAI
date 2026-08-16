@@ -1040,7 +1040,7 @@ export default function Index() {
 
       const isAppOrSaaSRequest = /\b(uygulama|app|saas|panel|dashboard|platform|site|yazılım|tool|sistem|proje|tasarla|oluştur|yap|seçimlerim|tercihlerim)\b/i.test(lower);
       if (isAppOrSaaSRequest && !isFix) {
-        promptToSend = `${promptToSend}\n\n[MİMARİ DİREKTİFİ: Lütfen basit bir HTML şablonu/tek index sayfası yerine; Lovable.dev kalitesinde, çok sekmeli/görünümlü (Dashboard/Özet, Ana Veri/İşlemler Listesi, Detay & Ekleme Modalları, Analitik Grafikler, Ayarlar), tam CRUD işlemlerine ve localStorage hafızasına sahip, zengin Tailwind CSS ve Lucide ikonlu, canlı çalışan eksiksiz bir SaaS web uygulamasını tek parça \`\`\`html ... \`\`\` bloğunda üret!]`;
+        promptToSend = `${promptToSend}\n\n[MİMARİ DİREKTİFİ: Lütfen modüler, gerçek React + TypeScript mimarisinde üretim yap. Projeyi ayrı dosyalara böl: 'src/App.tsx' (Router ve Ana Düzen), 'src/pages/*.tsx' (Örn: Dashboard.tsx, Analytics.tsx, Settings.tsx), 'src/components/*.tsx' (Navbar.tsx, Sidebar.tsx, Modal.tsx), 'src/types.ts'. Her dosyayı [FILE:src/dosya.tsx]...[/FILE] veya araç çağrılarıyla teslim et!]`;
       }
 
       let capturedWebQuery: string | undefined = undefined;
@@ -1061,6 +1061,71 @@ export default function Index() {
         } catch (searchErr) {
           console.warn("Pre-prompt web search error:", searchErr);
         }
+      }
+
+      // ── GERÇEK OTONOM AJAN DÖNGÜSÜ (Proje / SaaS / Web Uygulaması İstekleri) ──
+      const lastProjectMsg = [...messages].reverse().find(m => m.role === "assistant" && m.projectFiles && m.projectFiles.length > 0);
+      const existingProjectFiles = lastProjectMsg?.projectFiles || (code ? [{ path: "src/App.tsx", content: code, lang: "tsx" as const }] : []);
+
+      const isAutonomousAppRequest = (wantsSite || isAppOrSaaSRequest || model === "pro") && !isFix && !shouldUseFileEdit;
+      if (isAutonomousAppRequest) {
+        log("ai", "🧠 Otonom Ajan Başlatıldı: Çoklu dosya ve araç çağırma döngüsü çalışıyor...");
+        const placeholder: Msg = {
+          role: "assistant",
+          chat: "🧠 Otonom Ajan Geliştirme Döngüsü Başlatılıyor...",
+          autoEvents: []
+        };
+        setMessages(m => [...m, placeholder]);
+        setInput("");
+        setPendingAttachments([]);
+
+        const events: AutoEvent[] = [];
+        const agentResult = await runAutonomousAgent({
+          prompt: promptToSend,
+          systemPrompt,
+          model,
+          existingFiles: existingProjectFiles,
+          onEvent: (ev) => {
+            events.push(ev);
+            if (ev.type === "step") log("ai", `▶ ${ev.title}`);
+            if (ev.type === "log") log("info", `${ev.text}`);
+            if (ev.type === "file") log("info", `📝 Dosya: ${ev.path}`);
+            if (ev.type === "error") log("error", `⚠ ${ev.message}`);
+            if (ev.type === "test") log(ev.ok ? "success" : "error", ev.ok ? "✅ Test & Derleme Başarılı" : "❌ Derleme Hatası");
+            
+            setMessages(m => m.map(msg => msg === placeholder ? {
+              ...msg,
+              autoEvents: [...events],
+              chat: ev.type === "thought" ? ev.text : msg.chat
+            } : msg));
+          }
+        });
+
+        if (agentResult.finalMsg.code) {
+          setCode(agentResult.finalMsg.code);
+          setCodeType("html");
+        }
+
+        setMessages(m => m.map(msg => msg === placeholder ? {
+          ...msg,
+          ...agentResult.finalMsg,
+          autoEvents: events
+        } : msg));
+
+        if (user?.id && agentResult.finalMsg.code) {
+          const { data: row } = await supabase.from("sites").insert({
+            prompt: currentPrompt,
+            code: agentResult.finalMsg.code,
+            type: "html",
+            model,
+            user_id: user.id
+          }).select().single();
+          if (row) loadHistory();
+        }
+
+        setBusy(false);
+        log("success", `✅ Otonom Ajan: ${agentResult.finalMsg.projectFiles?.length || 1} dosya başarıyla derlendi!`);
+        return;
       }
 
       let userMsgContent: any = promptToSend;

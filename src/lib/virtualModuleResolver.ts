@@ -302,8 +302,8 @@ export function buildVirtualSandboxBundle(config: VirtualSandboxConfig): string 
 
         try {
           return Babel.transform(transformed, {
-            presets: ['react'],
-            filename: path || 'module.jsx'
+            presets: ['react', 'typescript'],
+            filename: path || 'module.tsx'
           }).code;
         } catch (err) {
           console.error("Babel hatası:", path, err);
