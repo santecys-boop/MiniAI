@@ -951,9 +951,31 @@ export default function Index() {
         promptToSend = `${fileBlocks}\n\n${input}`;
       }
 
+      const attachedImages = pendingAttachments.filter(a => a.kind === "image");
+      if (attachedImages.length > 0) {
+        log("ai", `🔍 Görsel Analiz: ${attachedImages.length} adet görsel/fotoğraf inceleniyor...`);
+        toast.info(`🔍 Dur bir bakayım... ${attachedImages.length} adet görsel taranıyor...`);
+      }
+
       const isAppOrSaaSRequest = /\b(uygulama|app|saas|panel|dashboard|platform|site|yazılım|tool|sistem|proje|tasarla|oluştur|yap|seçimlerim|tercihlerim)\b/i.test(lower);
       if (isAppOrSaaSRequest && !isFix) {
         promptToSend = `${promptToSend}\n\n[MİMARİ DİREKTİFİ: Lütfen basit bir HTML şablonu/tek index sayfası yerine; Lovable.dev kalitesinde, çok sekmeli/görünümlü (Dashboard/Özet, Ana Veri/İşlemler Listesi, Detay & Ekleme Modalları, Analitik Grafikler, Ayarlar), tam CRUD işlemlerine ve localStorage hafızasına sahip, zengin Tailwind CSS ve Lucide ikonlu, canlı çalışan eksiksiz bir SaaS web uygulamasını tek parça \`\`\`html ... \`\`\` bloğunda üret!]`;
+      }
+
+      let userMsgContent: any = promptToSend;
+      if (attachedImages.length > 0) {
+        userMsgContent = [
+          {
+            type: "text",
+            text: `${promptToSend}\n\n[GÖRSEL ANALİZ DİREKTİFİ: Kullanıcı ${attachedImages.length} adet görsel/ekran görüntüsü yükledi. Lütfen yanıta mutlaka "🔍 **Dur bir bakayım... Görselleri inceliyorum:**" diyerek başla; görseldeki tasarım düzenini, arayüz bileşenlerini, butonları, renk paletini ve yapıyı detaylıca analiz et ve ardından bu tasarıma birebir uygun çalışan eksiksiz uygulamayı / çözümü üret!]`
+          },
+          ...attachedImages.map(img => ({
+            type: "image_url" as const,
+            image_url: {
+              url: img.data
+            }
+          }))
+        ];
       }
 
       let aiTextResponse = "";
@@ -963,7 +985,7 @@ export default function Index() {
         const chatMsgs: AIMessage[] = [
           { role: "system", content: systemPrompt },
           ...aiHistory.map((h: any) => ({ role: h.role as "user" | "assistant", content: typeof h.content === "string" ? h.content : JSON.stringify(h.content) })),
-          { role: "user", content: promptToSend }
+          { role: "user", content: userMsgContent }
         ];
 
         const providerResult = await executeMultiProviderChat(

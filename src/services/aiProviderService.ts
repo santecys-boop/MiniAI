@@ -1,10 +1,18 @@
 // Mini AI Stealth Provider Service
 // Exclusively Powered by LLM7.io Multi-Key Vault Engine
-// Features: 4 Encrypted Vault Keys, Smart Model Routing (Fast / Pro), Resilient Network Failover.
+// Features: Multimodal Vision (Image Analysis), 4 Encrypted Vault Keys, Smart Model Routing (Fast / Pro).
+
+export interface AIMessageContentPart {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: {
+    url: string;
+  };
+}
 
 export interface AIMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | AIMessageContentPart[];
 }
 
 function _dec(encoded: string, key = 42): string {
@@ -30,18 +38,18 @@ const _V1 = [
 
 const _E1 = "Ql5eWlkQBQVLWkMERkZHHQRDRQVcGwVJQkteBUlFR1pGT15DRURZ";
 
-// Ultra-fast model priority for Mini AI Hızlı
+// Multimodal & Fast model priority for Mini AI Hızlı
 const FAST_MODELS = [
   "gemini-3.1-flash-lite",
   "DeepSeek-V4-Flash-0731",
   "codestral-latest"
 ];
 
-// High-capacity & SaaS code model priority for Mini AI Pro
+// Multimodal & SaaS code model priority for Mini AI Pro
 const PRO_MODELS = [
+  "gemini-3.1-flash-lite",
   "codestral-latest",
   "DeepSeek-V4-Flash-0731",
-  "gemini-3.1-flash-lite",
   "gpt-oss:20b"
 ];
 
@@ -70,7 +78,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 1
 export async function callLLM7(
   messages: AIMessage[],
   mode: "fast" | "pro" = "fast",
-  timeoutMs = 7500
+  timeoutMs = 8500
 ): Promise<AIResponseResult> {
   const totalKeys = _V1.length;
   const endpoint = _dec(_E1);
@@ -122,7 +130,7 @@ export async function executeMultiProviderChat(
   chosenModel?: string
 ): Promise<AIResponseResult> {
   const mode = chosenModel === "pro" ? "pro" : "fast";
-  const timeout = mode === "pro" ? 28000 : 16000;
+  const timeout = mode === "pro" ? 30000 : 18000;
 
   try {
     const res = await callLLM7(messages, mode, timeout);
@@ -132,7 +140,7 @@ export async function executeMultiProviderChat(
   } catch (err) {
     console.warn("LLM7 Primary Attempt failed, attempting fallback key rotation...", err);
     try {
-      const fallbackRes = await callLLM7(messages, mode === "pro" ? "fast" : "pro", 20000);
+      const fallbackRes = await callLLM7(messages, mode === "pro" ? "fast" : "pro", 22000);
       if (fallbackRes && fallbackRes.text && fallbackRes.text.trim().length > 0) {
         return fallbackRes;
       }
