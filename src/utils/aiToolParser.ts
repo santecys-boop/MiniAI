@@ -42,9 +42,15 @@ export function parseAIToolCalls(rawText: string): ParsedAIToolCalls {
     }
   }
 
-  // 2. Interactive Questions (ask_user_input_v0) Tespiti
+  // 2. Interactive Questions (ask_user_input_v0 / [QUESTION_CARD] / [QUESTIONS] / JSON)
   const askInputMatch = rawText.match(
     /<(?:antml:)?invoke\s+name=["']ask_user_input_v0["']>([\s\S]*?)<\/(?:antml:)?invoke>/i
+  ) || rawText.match(
+    /\[QUESTION(?:_CARD|S)?\]([\s\S]*?)\[\/QUESTION(?:_CARD|S)?\]/i
+  ) || rawText.match(
+    /<ask_user_input_v0>([\s\S]*?)<\/ask_user_input_v0>/i
+  ) || rawText.match(
+    /```(?:json:)?questions([\s\S]*?)```/i
   );
 
   if (askInputMatch) {
@@ -58,13 +64,14 @@ export function parseAIToolCalls(rawText: string): ParsedAIToolCalls {
         const jsonArr = JSON.parse(jsonArrayMatch[0]);
         if (Array.isArray(jsonArr)) {
           jsonArr.forEach((item: any, idx: number) => {
-            if (item && item.question) {
+            if (item && (item.question || item.title)) {
+              const qText = item.question || item.title;
               const opts = Array.isArray(item.options) ? item.options : ["Evet", "Hayır", "Farklı bir önerim var"];
               parsedItems.push({
                 id: `q_${idx + 1}`,
-                question: String(item.question).trim(),
+                question: String(qText).trim(),
                 options: opts.map((o: any) => String(o).trim()),
-                type: item.type === "multi_select" ? "multi_select" : "single_select",
+                type: item.type === "multi_select" || item.is_multi_select ? "multi_select" : "single_select",
               });
             }
           });
@@ -129,6 +136,9 @@ export function parseAIToolCalls(rawText: string): ParsedAIToolCalls {
     .replace(/<function_calls>[\s\S]*?<\/function_calls>/gi, "")
     .replace(/<antml:invoke[\s\S]*?<\/antml:invoke>/gi, "")
     .replace(/<invoke[\s\S]*?<\/invoke>/gi, "")
+    .replace(/\[QUESTION(?:_CARD|S)?\][\s\S]*?\[\/QUESTION(?:_CARD|S)?\]/gi, "")
+    .replace(/<ask_user_input_v0>[\s\S]*?<\/ask_user_input_v0>/gi, "")
+    .replace(/```(?:json:)?questions[\s\S]*?```/gi, "")
     .replace(/<antml:parameter[\s\S]*?<\/antml:parameter>/gi, "")
     .replace(/<parameter[\s\S]*?<\/parameter>/gi, "")
     .replace(/<antml:item>[\s\S]*?<\/antml:item>/gi, "")

@@ -49,6 +49,7 @@ import { executeMultiProviderChat, AIMessage } from "../services/aiProviderServi
 import { performDuckDuckGoSearch, formatSearchResultsForAI } from "../services/webSearchService";
 import { parseAIToolCalls, ParsedQuestionItem } from "../utils/aiToolParser";
 import { InteractiveQuestionsWidget } from "../components/InteractiveQuestionsWidget";
+import { GitHubCodespacesContractModal } from "../components/GitHubCodespacesContractModal";
 
 const GOOGLE_CLIENT_ID = "930467842733-udgjaa47gh812o1i6rn225m5m5lftufq.apps.googleusercontent.com";
 
@@ -69,17 +70,23 @@ export async function handleGoogleLogin() {
 }
 
 export const GITHUB_CLIENT_ID = "Ov23litbac1XB76ZUsLS";
+export const GITHUB_CLIENT_SECRET = "1b2991fea5050c58a3f2951306f0f4c3de9839a1";
 
-export async function handleGitHubLogin() {
+export async function initiateGitHubOAuthWithCodespaces() {
   try {
-    toast.loading("GitHub ile giriş yapılıyor...");
+    toast.loading("GitHub & Codespaces yetkilendirme sayfasına yönlendiriliyorsunuz...");
     const redirectUri = window.location.origin;
-    const targetUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent("read:user user:email")}&state=${Date.now()}`;
+    const scopes = "read:user user:email repo codespace workflow";
+    const targetUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${Date.now()}`;
     window.location.href = targetUrl;
   } catch (err: any) {
     toast.dismiss();
     toast.error(`GitHub ile giriş hatası: ${err.message || err}`);
   }
+}
+
+export async function handleGitHubLogin() {
+  initiateGitHubOAuthWithCodespaces();
 }
 
 export async function handleDiscordLogin() {
@@ -260,6 +267,7 @@ export default function Index() {
   const [agentAlts, setAgentAlts] = useState<{ idx: number; text: string }[] | null>(null);
   const [agentCurrent, setAgentCurrent] = useState(0);
   const [activeQuestions, setActiveQuestions] = useState<ParsedQuestionItem[] | null>(null);
+  const [githubContractOpen, setGithubContractOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -745,8 +753,9 @@ export default function Index() {
     e.target.value = "";
   }
 
-  async function send(opts?: { fix?: boolean; forceImage?: boolean; effort?: string }) {
-    if (!input.trim() && pendingAttachments.length === 0) return;
+  async function send(opts?: { fix?: boolean; forceImage?: boolean; effort?: string; customPrompt?: string }) {
+    const currentPrompt = (opts?.customPrompt !== undefined ? opts.customPrompt : input).trim();
+    if (!currentPrompt && pendingAttachments.length === 0) return;
     const isFix = !!opts?.fix;
     const isImageOnly = !!opts?.forceImage;
     if (isFix && !code) {
@@ -764,9 +773,9 @@ export default function Index() {
     setBusy(true);
 
     if (isImageOnly) {
-      const userMsg: Msg = { role: "user", chat: `🎨 Görsel Üret: ${input}`, attachments: pendingAttachments };
+      const userMsg: Msg = { role: "user", chat: `🎨 Görsel Üret: ${currentPrompt}`, attachments: pendingAttachments };
       setMessages(m => [...m, userMsg]);
-      log("info", `📤 🎨 Görsel Üret: ${input.slice(0, 60)}`);
+      log("info", `📤 🎨 Görsel Üret: ${currentPrompt.slice(0, 60)}`);
       
       const newMsg: Msg = {
         role: "assistant",
@@ -775,7 +784,7 @@ export default function Index() {
       setMessages(m => [...m, newMsg]);
       log("ai", "🎨 Görsel üretimi başlatılıyor...");
 
-      const promptToGen = input;
+      const promptToGen = currentPrompt;
       setInput("");
       setPendingAttachments([]);
 
@@ -826,7 +835,7 @@ export default function Index() {
       return;
     }
 
-    const lower = input.toLowerCase();
+    const lower = currentPrompt.toLowerCase();
     const explicitAutomation = !isFix && !isImageOnly && /\b(terminal|linux|bash|otomasyon|vm|e2b)\b/.test(lower);
     const wantsSite = !isFix && !isImageOnly && /\b(site|sayfa|page|landing|portfolyo|portfolio|uygulama|app|web ?site|tasarla|tasarım|yap bana|bana .* yap|oluştur|build|create)\b/.test(lower);
     const shouldUseE2B = false;
@@ -837,9 +846,9 @@ export default function Index() {
     const wantsZipEdit = isZip && /\b(düzelt|düzenle|değiştir|güncelle|ekle|kaldır|sil|çevir|refactor|fix|edit|update|değistir)\b/.test(lower);
     const shouldUseFileEdit = !isFix && wantsZipEdit;
 
-    const userMsg: Msg = { role: "user", chat: isFix ? `🔧 Düzelt: ${input}` : isImageOnly ? `🎨 Görsel Üret: ${input}` : input, attachments: pendingAttachments };
+    const userMsg: Msg = { role: "user", chat: isFix ? `🔧 Düzelt: ${currentPrompt}` : isImageOnly ? `🎨 Görsel Üret: ${currentPrompt}` : currentPrompt, attachments: pendingAttachments };
     setMessages(m => [...m, userMsg]);
-    log("info", `📤 ${isFix ? "🔧 Düzeltme: " : isImageOnly ? "🎨 Görsel Üret: " : ""}${input.slice(0, 60) || "(sadece ek)"}`);
+    log("info", `📤 ${isFix ? "🔧 Düzeltme: " : isImageOnly ? "🎨 Görsel Üret: " : ""}${currentPrompt.slice(0, 60) || "(sadece ek)"}`);
     log("ai", isImageOnly ? "🎨 Görsel tasarlanıyor..." : "⚡ Mini AI düşünüyor...");
 
     const aiHistory = messages.filter(m => m.chat || m.code).map(m => ({
@@ -965,7 +974,7 @@ export default function Index() {
       }
 
       // İsim Tespiti ve Hafızaya Kaydetme
-      const nameMatch = input.match(/(?:benim adım|adım|ismim|bana\s+([a-zA-ZğüşıöçĞÜŞİÖÇ]+)\s+de)\s+([a-zA-ZğüşıöçĞÜŞİÖÇ]+)/i);
+      const nameMatch = currentPrompt.match(/(?:benim adım|adım|ismim|bana\s+([a-zA-ZğüşıöçĞÜŞİÖÇ]+)\s+de)\s+([a-zA-ZğüşıöçĞÜŞİÖÇ]+)/i);
       if (nameMatch) {
         const detectedName = nameMatch[2] || nameMatch[1];
         if (detectedName && detectedName.length > 1) localStorage.setItem("mini_ai_user_name", detectedName);
@@ -975,10 +984,10 @@ export default function Index() {
       const systemPrompt = AI_SYSTEM_PROMPT;
 
       const textFiles = pendingAttachments.filter(a => a.kind === "file" && !/\.zip$/i.test(a.name));
-      let promptToSend = input;
+      let promptToSend = currentPrompt;
       if (textFiles.length > 0) {
         const fileBlocks = textFiles.map(f => `[DOSYA: ${f.name}]\n${f.data}\n[/DOSYA]`).join("\n\n");
-        promptToSend = `${fileBlocks}\n\n${input}`;
+        promptToSend = `${fileBlocks}\n\n${currentPrompt}`;
       }
 
       const attachedImages = pendingAttachments.filter(a => a.kind === "image");
@@ -1614,10 +1623,8 @@ export default function Index() {
               questions={activeQuestions}
               onComplete={(responseSummary) => {
                 setActiveQuestions(null);
-                setInput(responseSummary);
-                setTimeout(() => {
-                  send();
-                }, 100);
+                setInput("");
+                send({ customPrompt: responseSummary });
               }}
               onDismiss={() => setActiveQuestions(null)}
             />
@@ -1724,9 +1731,9 @@ export default function Index() {
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-200/60 text-left text-xs text-stone-800 font-medium">
                   <LogIn className="w-4 h-4 text-blue-600" /> Google ile Giriş
                 </button>
-                <button onClick={handleGitHubLogin}
+                <button onClick={() => { setGithubContractOpen(true); setMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-200/60 text-left text-xs text-stone-800 font-medium">
-                  <Code2 className="w-4 h-4 text-purple-600" /> GitHub ile Giriş
+                  <Code2 className="w-4 h-4 text-purple-600" /> GitHub & Codespaces ile Giriş
                 </button>
                 <button onClick={() => { setSmsOpen(true); setMenuOpen(false); setSmsStep("phone"); }}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-stone-200/60 text-left text-xs text-stone-800 font-medium">
@@ -2113,13 +2120,13 @@ export default function Index() {
             </button>
 
             <button
-              onClick={handleGitHubLogin}
+              onClick={() => setGithubContractOpen(true)}
               className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-stone-900 hover:bg-stone-800 text-white border border-stone-700 font-semibold text-sm shadow-md transition active:scale-[0.98]"
             >
               <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
                 <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
               </svg>
-              <span>GitHub ile Giriş Yap</span>
+              <span>GitHub & Codespaces ile Giriş Yap</span>
             </button>
 
             <div className="relative flex items-center justify-center my-2">
@@ -2141,6 +2148,12 @@ export default function Index() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <GitHubCodespacesContractModal
+        open={githubContractOpen}
+        onOpenChange={setGithubContractOpen}
+        onConfirm={initiateGitHubOAuthWithCodespaces}
+      />
 
       <ImagePreviewModal imageUrl={previewImageUrl} onClose={() => setPreviewImageUrl(null)} />
     </div>
