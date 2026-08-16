@@ -197,19 +197,23 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
               {m.webSearchSources.map((source, sIdx) => {
                 let domain = "";
-                try { domain = new URL(source.url || "https://duckduckgo.com").hostname.replace(/^www\./, ""); } catch (_) { domain = "duckduckgo.com"; }
+                try { domain = new URL(source.url || "https://duckduckgo.com").hostname.replace(/^www\./, ""); } catch (_) { domain = "web"; }
                 return (
                   <a
                     key={sIdx}
                     href={source.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white dark:bg-stone-950/70 border border-stone-200/80 dark:border-stone-800/80 hover:border-blue-500/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all text-stone-700 dark:text-stone-300 group cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (source.url) window.open(source.url, "_blank", "noopener,noreferrer");
+                    }}
+                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white dark:bg-stone-950/70 border border-stone-200/80 dark:border-stone-800/80 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-all text-stone-700 dark:text-stone-300 group cursor-pointer shadow-2xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="truncate">
-                        <p className="font-medium truncate text-[11.5px] text-stone-800 dark:text-stone-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        <p className="font-medium truncate text-[12px] text-stone-800 dark:text-stone-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {source.title}
                         </p>
                         <p className="text-[10px] text-stone-400 truncate">
@@ -217,7 +221,7 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
                         </p>
                       </div>
                     </div>
-                    <ExternalLink className="w-3 h-3 text-stone-400 group-hover:text-blue-500 shrink-0" />
+                    <ExternalLink className="w-3.5 h-3.5 text-stone-400 group-hover:text-blue-500 shrink-0" />
                   </a>
                 );
               })}

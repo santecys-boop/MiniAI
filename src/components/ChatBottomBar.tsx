@@ -26,13 +26,16 @@ export type ChatBottomBarProps = {
   openPricing: () => void;
   isImageMode?: boolean;
   setIsImageMode?: (v: boolean | ((prev: boolean) => boolean)) => void;
+  isWebSearchMode?: boolean;
+  setIsWebSearchMode?: (v: boolean | ((prev: boolean) => boolean)) => void;
 };
 
 export function ChatBottomBar({
   input, setInput, pendingAttachments, setPendingAttachments, busy, setBusy,
   model, setModel, hasCode, send, toggleMic, attachOpen, setAttachOpen,
   fileInputRef, imageInputRef, cameraInputRef, openPricing,
-  isImageMode = false, setIsImageMode
+  isImageMode = false, setIsImageMode,
+  isWebSearchMode = false, setIsWebSearchMode
 }: ChatBottomBarProps) {
 
   const modelMap: Record<string, string> = {
@@ -112,7 +115,15 @@ export function ChatBottomBar({
         models={["Mini AI Hızlı", "Mini AI Pro"]}
         efforts={["Low", "Medium", "Max Effort"]}
         isImageMode={isImageMode}
-        onToggleImageMode={() => setIsImageMode?.(prev => !prev)}
+        onToggleImageMode={() => {
+          setIsImageMode?.(prev => !prev);
+          if (!isImageMode) setIsWebSearchMode?.(false);
+        }}
+        isWebSearchMode={isWebSearchMode}
+        onToggleWebSearchMode={() => {
+          setIsWebSearchMode?.(prev => !prev);
+          if (!isWebSearchMode) setIsImageMode?.(false);
+        }}
       />
     </div>
   );

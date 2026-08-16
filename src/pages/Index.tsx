@@ -46,7 +46,7 @@ import { DatabaseSchemaViewer } from "../components/DatabaseSchemaViewer";
 import { unlockAudioEngine } from "@/services/neuralVoiceService";
 import { MultiFileSandboxPreview } from "../components/MultiFileSandboxPreview";
 import { executeMultiProviderChat, AIMessage } from "../services/aiProviderService";
-import { performDuckDuckGoSearch, formatSearchResultsForAI } from "../services/webSearchService";
+import { performDuckDuckGoSearch, formatSearchResultsForAI, shouldAutoWebSearch } from "../services/webSearchService";
 import { parseAIToolCalls, ParsedQuestionItem } from "../utils/aiToolParser";
 import { InteractiveQuestionsWidget } from "../components/InteractiveQuestionsWidget";
 import { GitHubCodespacesContractModal } from "../components/GitHubCodespacesContractModal";
@@ -269,6 +269,7 @@ export default function Index() {
   const [activeQuestions, setActiveQuestions] = useState<ParsedQuestionItem[] | null>(null);
   const [githubContractOpen, setGithubContractOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
+  const [isWebSearchMode, setIsWebSearchMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -1042,6 +1043,26 @@ export default function Index() {
         promptToSend = `${promptToSend}\n\n[MİMARİ DİREKTİFİ: Lütfen basit bir HTML şablonu/tek index sayfası yerine; Lovable.dev kalitesinde, çok sekmeli/görünümlü (Dashboard/Özet, Ana Veri/İşlemler Listesi, Detay & Ekleme Modalları, Analitik Grafikler, Ayarlar), tam CRUD işlemlerine ve localStorage hafızasına sahip, zengin Tailwind CSS ve Lucide ikonlu, canlı çalışan eksiksiz bir SaaS web uygulamasını tek parça \`\`\`html ... \`\`\` bloğunda üret!]`;
       }
 
+      let capturedWebQuery: string | undefined = undefined;
+      let capturedWebSources: any[] | undefined = undefined;
+
+      const needsWebSearch = isWebSearchMode || shouldAutoWebSearch(currentPrompt);
+      if (needsWebSearch && !isFix) {
+        setIsWebSearchMode(false);
+        capturedWebQuery = currentPrompt;
+        log("ai", `🔍 Canlı Web Arama: "${currentPrompt}" taranıyor...`);
+        toast.info(`🔍 Web Arama: "${currentPrompt}" taranıyor...`);
+        try {
+          const searchResults = await performDuckDuckGoSearch(currentPrompt);
+          capturedWebSources = searchResults;
+          log("success", `🌐 Web: ${searchResults.length} canlı kaynak bulundu.`);
+          const formattedResults = formatSearchResultsForAI(currentPrompt, searchResults);
+          promptToSend = `${formattedResults}\n\n[KULLANICI SORUSU: ${promptToSend}]`;
+        } catch (searchErr) {
+          console.warn("Pre-prompt web search error:", searchErr);
+        }
+      }
+
       let userMsgContent: any = promptToSend;
       if (attachedImages.length > 0) {
         userMsgContent = [
@@ -1107,21 +1128,18 @@ export default function Index() {
         aiTextResponse = "Bugünlük kredin bizim için bitmiştir, yarın sıfırdan başlayabilirsiniz.";
       }
 
-      // ── Web Arama & Etkileşimli Soru Ayrıştırma ──
+      // ── Web Arama & Etkileşimli Soru Ayrıştırma (Eğer Önceden Yapılmadıysa) ──
       const initialToolCalls = parseAIToolCalls(aiTextResponse);
 
-      let capturedWebQuery: string | undefined = undefined;
-      let capturedWebSources: any[] | undefined = undefined;
-
       // 1. DuckDuckGo Web Arama Aracı
-      if (initialToolCalls.webSearchQuery) {
+      if (initialToolCalls.webSearchQuery && !capturedWebSources) {
         capturedWebQuery = initialToolCalls.webSearchQuery;
         log("ai", `🔍 Web Arama: "${initialToolCalls.webSearchQuery}" taranıyor...`);
-        toast.info(`🔍 DuckDuckGo: "${initialToolCalls.webSearchQuery}" aranıyor...`);
+        toast.info(`🔍 Web Arama: "${initialToolCalls.webSearchQuery}" aranıyor...`);
         try {
           const searchResults = await performDuckDuckGoSearch(initialToolCalls.webSearchQuery);
           capturedWebSources = searchResults;
-          log("success", `🌐 DuckDuckGo: ${searchResults.length} sonuç bulundu.`);
+          log("success", `🌐 Web: ${searchResults.length} sonuç bulundu.`);
           const formattedResults = formatSearchResultsForAI(initialToolCalls.webSearchQuery, searchResults);
 
           const searchFollowUpMsgs: AIMessage[] = [
@@ -1721,6 +1739,8 @@ export default function Index() {
             openPricing={() => setPricingOpen(true)}
             isImageMode={isImageMode}
             setIsImageMode={setIsImageMode}
+            isWebSearchMode={isWebSearchMode}
+            setIsWebSearchMode={setIsWebSearchMode}
           />
         </aside>
       </div>
