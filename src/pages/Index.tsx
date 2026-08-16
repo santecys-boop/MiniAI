@@ -43,6 +43,7 @@ import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import UserProfilePopover from "../components/UserProfilePopover";
 import { ProjectFileTree } from "../components/ProjectFileTree";
 import { DatabaseSchemaViewer } from "../components/DatabaseSchemaViewer";
+import { unlockAudioEngine } from "@/services/neuralVoiceService";
 import { MultiFileSandboxPreview } from "../components/MultiFileSandboxPreview";
 import { executeMultiProviderChat, AIMessage } from "../services/aiProviderService";
 
@@ -1260,7 +1261,10 @@ export default function Index() {
     iframeRef.current?.contentWindow?.postMessage({ type: "mini-get-html" }, "*");
   }
 
-  function toggleMic() { setVoiceOpen(true); }
+  function toggleMic() {
+    unlockAudioEngine();
+    setVoiceOpen(true);
+  }
 
   function toggleMute() {
     const nv = !muted;

@@ -853,6 +853,7 @@ export default function VoiceMode({
   const closedRef = useRef(false);     // bileşen kapandı mı
   const recognitionRef = useRef<any>(null);
   const speechTranscriptRef = useRef<string>("");
+  const silenceTimeoutRef = useRef<any>(null);
 
   /* En güncel değerlere ref üzerinden erişim (stale closure önlemi) */
   const voiceRef = useRef(voice);
@@ -880,6 +881,10 @@ export default function VoiceMode({
     abortRef.current?.abort();
     abortRef.current = null;
     stopNeuralSpeech();
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
     try {
       if (recognitionRef.current) {
         recognitionRef.current.onresult = null;
@@ -954,6 +959,19 @@ export default function VoiceMode({
           setCaption(combined);
           smoothLevelRef.current = 0.4 + Math.random() * 0.4;
           setLevel(smoothLevelRef.current);
+
+          // Cümle bitişinde 1.2s sessizlik algılandığında otomatik gönder
+          if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = setTimeout(() => {
+            if (!closedRef.current && stateRef.current === "listening" && !busyRef.current) {
+              if (speechTranscriptRef.current.trim()) {
+                const textToSend = speechTranscriptRef.current.trim();
+                speechTranscriptRef.current = "";
+                busyRef.current = true;
+                void converse(textToSend);
+              }
+            }
+          }, 1200);
         }
       };
 
@@ -1485,7 +1503,26 @@ export default function VoiceMode({
 
       {/* ══════════ ORTA — bulut küresi + altyazı ══════════ */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 min-h-0">
-        <CloudOrb level={level} state={state} size={232} />
+        <div
+          className="cursor-pointer active:scale-95 transition-transform"
+          onClick={() => {
+            if (isSpeaking) {
+              interrupt();
+            } else if (isListening) {
+              const text = speechTranscriptRef.current.trim();
+              if (text) {
+                speechTranscriptRef.current = "";
+                busyRef.current = true;
+                void converse(text);
+              } else {
+                haptic(10);
+              }
+            }
+          }}
+          title={isSpeaking ? "Sözünü kesmek için dokun" : isListening ? "Göndermek veya konuşmak için dokun" : ""}
+        >
+          <CloudOrb level={level} state={state} size={232} />
+        </div>
 
         {/* Altyazı / durum metni */}
         <div className="mt-10 max-w-md text-center min-h-[4.25rem] px-2">
@@ -1500,9 +1537,9 @@ export default function VoiceMode({
             </p>
           ) : (
             <p className="text-[15px] text-slate-400" aria-live="polite">
-              {isListening && "Dinliyorum, konuşabilirsin"}
+              {isListening && "Dinliyorum, konuşabilirsin..."}
               {isThinking && "Düşünüyorum…"}
-              {isSpeaking && "Konuşuyorum — kesmek için mikrofona dokun"}
+              {isSpeaking && "Konuşuyorum — kesmek için dokun"}
               {state === "idle" && "Hazırlanıyor…"}
             </p>
           )}
@@ -1551,7 +1588,20 @@ export default function VoiceMode({
 
           {/* Mikrofon butonu */}
           <button
-            onClick={isSpeaking ? interrupt : undefined}
+            onClick={() => {
+              if (isSpeaking) {
+                interrupt();
+              } else if (isListening) {
+                const text = speechTranscriptRef.current.trim();
+                if (text) {
+                  speechTranscriptRef.current = "";
+                  busyRef.current = true;
+                  void converse(text);
+                } else {
+                  haptic(8);
+                }
+              }
+            }}
             aria-label={isSpeaking ? "Sözünü kes ve konuş" : "Mikrofon"}
             className="relative w-[58px] h-[58px] rounded-full bg-white border border-slate-200/90 shadow-[0_1px_6px_rgba(0,0,0,0.04)] flex items-center justify-center shrink-0 active:scale-95 transition-transform"
           >

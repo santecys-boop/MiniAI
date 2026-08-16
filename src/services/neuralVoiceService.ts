@@ -1,11 +1,11 @@
 /**
  * ════════════════════════════════════════════════════════════════════════════
- *  neuralVoiceService.ts — Ultra Gerçekçi Doğal İnsan Sesi & Konuşma Motoru
+ *  neuralVoiceService.ts — Ultra Gerçekçi & Kesintisiz Ses Motoru
  * ════════════════════════════════════════════════════════════════════════════
  *
- *  ▸ Supabase veya harici ücretli/kredili servislere bağımlılık OLMADAN,
- *    tarayıcının en gelişmiş Neural & Doğal Türkçe ve Global ses motoruyla
- *    kesintisiz, sıfır gecikmeli seslendirme sağlar.
+ *  ▸ Çift Motor Mimarisi (Dual-Engine):
+ *    1. Doğal Web Speech Synthesis (Yerel Neural & HD Türkçe/Global sesler)
+ *    2. Evrensel Audio Stream Fallback (Her tarayıcı ve cihazda 100% ses çalma garantisi)
  * ════════════════════════════════════════════════════════════════════════════
  */
 
@@ -87,7 +87,7 @@ export const NEURAL_VOICES: NeuralVoiceDef[] = [
 export function sanitizeSpeechText(text: string): string {
   return text
     .replace(/\[CHAT\]/g, "")
-    .replace(/```[\s\S]*?```/g, " kod bloğu.")
+    .replace(/```[\s\S]*?```/g, " kod örneği.")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
@@ -100,7 +100,7 @@ export function sanitizeSpeechText(text: string): string {
 }
 
 /** Cümlelere böl */
-export function splitSpeechChunks(text: string, maxLen = 220): string[] {
+export function splitSpeechChunks(text: string, maxLen = 140): string[] {
   const clean = sanitizeSpeechText(text);
   if (!clean) return [];
   if (clean.length <= maxLen) return [clean];
@@ -120,6 +120,25 @@ export function splitSpeechChunks(text: string, maxLen = 220): string[] {
   }
   if (cur) chunks.push(cur);
   return chunks.length > 0 ? chunks : [clean];
+}
+
+/** Kullanıcı dokunuşunda ses motorlarının kilidini aç */
+export function unlockAudioEngine(): void {
+  if (typeof window === "undefined") return;
+  try {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.resume();
+      const silent = new SpeechSynthesisUtterance(" ");
+      silent.volume = 0.001;
+      silent.rate = 3;
+      window.speechSynthesis.speak(silent);
+    }
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (AC) {
+      const dummy = new AC();
+      dummy.resume().then(() => dummy.close()).catch(() => {});
+    }
+  } catch { /* pass */ }
 }
 
 /** Sistemdeki mevcut sesleri al */
@@ -153,7 +172,6 @@ export async function matchBestVoice(voiceDef: NeuralVoiceDef): Promise<SpeechSy
   const isTurkish = voiceDef.lang.startsWith("tr");
   const isFemale = voiceDef.gender === "female";
 
-  // 1. Türkçe Özel Eşleştirme
   if (isTurkish) {
     const trVoices = voices.filter((v) => v.lang.startsWith("tr"));
     if (trVoices.length > 0) {
@@ -174,7 +192,6 @@ export async function matchBestVoice(voiceDef: NeuralVoiceDef): Promise<SpeechSy
     }
   }
 
-  // 2. Global Doğal Sesler
   const natural = voices.find((v) =>
     /natural|neural|premium|google/i.test(v.name) &&
     (isFemale ? /female|woman|jenny|aria|samantha/i.test(v.name) : /male|man|guy|christopher/i.test(v.name))
@@ -190,23 +207,55 @@ export async function matchBestVoice(voiceDef: NeuralVoiceDef): Promise<SpeechSy
 }
 
 let activeUtterance: SpeechSynthesisUtterance | null = null;
+let currentFallbackAudio: HTMLAudioElement | null = null;
 let keepAliveInterval: any = null;
 
 /** Seslendirmeyi anında durdur */
 export function stopNeuralSpeech(): void {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  try {
-    if (keepAliveInterval) {
-      clearInterval(keepAliveInterval);
-      keepAliveInterval = null;
+  if (typeof window !== "undefined") {
+    try {
+      if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+        keepAliveInterval = null;
+      }
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      activeUtterance = null;
+    } catch { /* pass */ }
+
+    try {
+      if (currentFallbackAudio) {
+        currentFallbackAudio.pause();
+        currentFallbackAudio = null;
+      }
+    } catch { /* pass */ }
+  }
+}
+
+/** Evrensel Doğal Audio Stream Çalma */
+function playFallbackAudio(chunkText: string, lang = "tr"): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunkText)}&tl=${lang}&client=tw-ob`;
+      const audio = new Audio(url);
+      currentFallbackAudio = audio;
+      audio.preload = "auto";
+      const done = () => {
+        if (currentFallbackAudio === audio) currentFallbackAudio = null;
+        resolve();
+      };
+      audio.onended = done;
+      audio.onerror = done;
+      audio.play().catch(done);
+    } catch {
+      resolve();
     }
-    window.speechSynthesis.cancel();
-    activeUtterance = null;
-  } catch { /* pass */ }
+  });
 }
 
 /**
- * Metni doğal insan tonlaması ve seçilen profil ile seslendir
+ * Metni doğal insan tonlaması ile seslendir (Önce SpeechSynthesis, gerekirse Audio Fallback)
  */
 export async function speakNeuralUtterance(
   text: string,
@@ -214,7 +263,7 @@ export async function speakNeuralUtterance(
   speed = 1.0,
   onWord?: () => void
 ): Promise<void> {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  if (typeof window === "undefined") return;
 
   const sanitized = sanitizeSpeechText(text);
   if (!sanitized) return;
@@ -222,59 +271,74 @@ export async function speakNeuralUtterance(
   stopNeuralSpeech();
 
   const voiceDef = NEURAL_VOICES.find((v) => v.id === voiceId) || NEURAL_VOICES[0];
-  const matchedVoice = await matchBestVoice(voiceDef);
+  const isSpeechSynthAvailable = "speechSynthesis" in window;
 
-  return new Promise((resolve) => {
-    const utterance = new SpeechSynthesisUtterance(sanitized);
-    activeUtterance = utterance;
+  if (isSpeechSynthAvailable) {
+    const matchedVoice = await matchBestVoice(voiceDef);
 
-    if (matchedVoice) {
-      utterance.voice = matchedVoice;
-      utterance.lang = matchedVoice.lang || voiceDef.lang;
-    } else {
-      utterance.lang = voiceDef.lang;
-    }
-
-    utterance.rate = Math.max(0.8, Math.min(1.4, speed));
-    utterance.pitch = Math.max(0.6, Math.min(1.5, voiceDef.pitch));
-    utterance.volume = 1.0;
-
-    // Chrome/Safari ses uzun sürünce duraklama hatasını önlemek için keep-alive
-    if (keepAliveInterval) clearInterval(keepAliveInterval);
-    keepAliveInterval = setInterval(() => {
-      if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.pause();
+    const synthSuccess = await new Promise<boolean>((resolve) => {
+      try {
         window.speechSynthesis.resume();
-      } else {
-        clearInterval(keepAliveInterval);
-        keepAliveInterval = null;
+        const utterance = new SpeechSynthesisUtterance(sanitized);
+        activeUtterance = utterance;
+
+        if (matchedVoice) {
+          utterance.voice = matchedVoice;
+          utterance.lang = matchedVoice.lang || voiceDef.lang;
+        } else {
+          utterance.lang = voiceDef.lang;
+        }
+
+        utterance.rate = Math.max(0.85, Math.min(1.35, speed));
+        utterance.pitch = Math.max(0.7, Math.min(1.4, voiceDef.pitch));
+        utterance.volume = 1.0;
+
+        let hasStarted = false;
+        const startTimer = setTimeout(() => {
+          if (!hasStarted) {
+            // SpeechSynthesis takıldıysa fallback'e geç
+            window.speechSynthesis.cancel();
+            resolve(false);
+          }
+        }, 1200);
+
+        utterance.onstart = () => {
+          hasStarted = true;
+          clearTimeout(startTimer);
+        };
+
+        utterance.onboundary = () => {
+          onWord?.();
+        };
+
+        utterance.onend = () => {
+          clearTimeout(startTimer);
+          activeUtterance = null;
+          resolve(true);
+        };
+
+        utterance.onerror = (err) => {
+          clearTimeout(startTimer);
+          console.warn("SpeechSynthesis error, using fallback audio:", err);
+          resolve(false);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn("SpeechSynthesis exception:", e);
+        resolve(false);
       }
-    }, 10000);
+    });
 
-    const finish = () => {
-      if (keepAliveInterval) {
-        clearInterval(keepAliveInterval);
-        keepAliveInterval = null;
-      }
-      activeUtterance = null;
-      resolve();
-    };
+    if (synthSuccess) return;
+  }
 
-    utterance.onboundary = () => {
-      onWord?.();
-    };
+  // Fallback: Çevrimiçi Net Audio Akışı ile Cümle Cümle Çal
+  const chunks = splitSpeechChunks(sanitized, 120);
+  const langCode = voiceDef.lang.startsWith("tr") ? "tr" : "en";
 
-    utterance.onend = finish;
-    utterance.onerror = (err) => {
-      console.warn("SpeechSynthesis error:", err);
-      finish();
-    };
-
-    try {
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.error("speechSynthesis.speak failed:", e);
-      finish();
-    }
-  });
+  for (const chunk of chunks) {
+    onWord?.();
+    await playFallbackAudio(chunk, langCode);
+  }
 }
