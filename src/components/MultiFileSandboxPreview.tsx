@@ -15,6 +15,8 @@ import {
 import { ProjectFile } from "../types";
 import { generateVirtualPreviewHtml, exportProjectToZip } from "../utils";
 import { toast } from "sonner";
+import { CodespacesCloudManager } from "./CodespacesCloudManager";
+import { Server } from "lucide-react";
 
 interface MultiFileSandboxPreviewProps {
   files: ProjectFile[];
@@ -34,6 +36,7 @@ export const MultiFileSandboxPreview: React.FC<MultiFileSandboxPreviewProps> = (
   const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [codespacesOpen, setCodespacesOpen] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const previewHtml = generateVirtualPreviewHtml(files, projectName);
@@ -125,8 +128,16 @@ export const MultiFileSandboxPreview: React.FC<MultiFileSandboxPreviewProps> = (
           </button>
         </div>
 
-        {/* Sağ: ZIP İndir Butonu */}
+        {/* Sağ: Codespaces & ZIP İndir Butonları */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCodespacesOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-blue-300 font-semibold rounded-xl text-xs border border-blue-500/30 shadow-md transition-all active:scale-[0.98]"
+            title="GitHub Codespaces Bulut Sunucusu, Yedekleme ve Kod Analizi"
+          >
+            <Server className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">Codespaces Bulut</span>
+          </button>
           <button
             onClick={handleDownloadZip}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-semibold rounded-xl text-xs shadow-md transition-all active:scale-[0.98]"
@@ -136,6 +147,14 @@ export const MultiFileSandboxPreview: React.FC<MultiFileSandboxPreviewProps> = (
           </button>
         </div>
       </div>
+
+      <CodespacesCloudManager
+        files={files}
+        projectName={projectName}
+        databaseQueries={databaseQueries}
+        open={codespacesOpen}
+        onOpenChange={setCodespacesOpen}
+      />
 
       {/* İframe Sanal Çalışma Ortamı */}
       <div className="flex-1 bg-stone-900/40 p-3 sm:p-6 flex items-center justify-center overflow-auto">
