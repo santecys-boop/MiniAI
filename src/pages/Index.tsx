@@ -1111,7 +1111,9 @@ export default function Index() {
         aiTextResponse = finalToolCheck.cleanText;
       }
 
-      parsed = parseAIResponse(aiTextResponse, textFiles[0]?.name);
+      const wantsCompileOrBuild = /\b(apk|zip|build|derle|compile|run|çalıştır|calis|execute|bin|exe|paketle|terminal|linux|bash|npm|pip|python|docker|git|node|server|sh)\b/i.test(lower);
+      let allCandidates: { idx: number; text: string }[] | undefined;
+      const parsed = parseAIResponse(aiTextResponse, textFiles[0]?.name);
       setAgentAlts(null);
       const projApiKey = generateProjectApiKey();
       
