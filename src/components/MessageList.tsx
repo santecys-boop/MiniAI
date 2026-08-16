@@ -17,23 +17,7 @@ export type MessageListProps = {
 export function MessageList({ messages, isLoading, welcomeText, welcomeDone, chatEndRef, onImageClick, onVideoClick }: MessageListProps) {
   if (messages.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 select-none animate-in fade-in duration-300">
-        {/* Mini AI Logo — Sağ tık ve sürükleme korumalı */}
-        <div 
-          className="mb-4 relative group cursor-default"
-          onContextMenu={(e) => { e.preventDefault(); return false; }}
-          onDragStart={(e) => { e.preventDefault(); return false; }}
-        >
-          <img
-            src="/mini-logo.png"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://i.ibb.co/8DHM6Tpy/1786875359182.png"; }}
-            alt="Mini AI Logo"
-            className="w-24 h-24 sm:w-28 sm:h-28 object-contain rounded-3xl drop-shadow-2xl select-none pointer-events-none transition-transform duration-300 group-hover:scale-105"
-            draggable={false}
-            onContextMenu={(e) => { e.preventDefault(); return false; }}
-          />
-        </div>
-
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 select-none">
         <h2 translate="no" className="notranslate text-[22px] font-semibold text-stone-900 dark:text-stone-100 text-center tracking-tight">
           {welcomeText}
           {!welcomeDone && (
