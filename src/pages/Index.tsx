@@ -804,14 +804,16 @@ export default function Index() {
       setMessages(m => [...m, userMsg]);
       log("info", `📤 🎨 Görsel Üret: ${currentPrompt.slice(0, 60)}`);
       
+      const promptToGen = currentPrompt;
       const newMsg: Msg = {
         role: "assistant",
         chat: "✨ Görseliniz özenle tasarlanıyor...",
+        imageGenPrompt: promptToGen,
+        imageGenStatus: "generating",
       };
       setMessages(m => [...m, newMsg]);
       log("ai", "🎨 Görsel üretimi başlatılıyor...");
 
-      const promptToGen = currentPrompt;
       setInput("");
       setPendingAttachments([]);
 
@@ -839,6 +841,9 @@ export default function Index() {
             return {
               ...msg,
               chat: `![Oluşturulan Görsel](${imgUrl})`,
+              imageGenPrompt: promptToGen,
+              imageGenStatus: "completed",
+              imageGenUrl: imgUrl,
               attachments: [{ kind: "image", name: "generated.png", data: imgUrl }]
             };
           }
@@ -850,7 +855,10 @@ export default function Index() {
           if (msg === newMsg) {
             return {
               ...msg,
-              chat: `⚠️ Görsel oluşturulamadı: ${imgErr.message}`
+              chat: `⚠️ Görsel oluşturulamadı: ${imgErr.message}`,
+              imageGenPrompt: promptToGen,
+              imageGenStatus: "failed",
+              imageGenError: imgErr.message
             };
           }
           return msg;
@@ -1215,12 +1223,25 @@ export default function Index() {
 
       if (aiImagePrompt) {
          log("ai", `🎨 Yapay Zeka Niyeti Algılandı: Görsel üretimi başlatılıyor...`);
+         setMessages(m => m.map(msg => {
+             if (msg === newMsg) {
+                 return {
+                     ...msg,
+                     imageGenPrompt: aiImagePrompt,
+                     imageGenStatus: "generating",
+                 };
+             }
+             return msg;
+         }));
          generateImageWithStableHorde(aiImagePrompt).then(imgUrl => {
             setMessages(m => m.map(msg => {
                 if (msg === newMsg) {
                     return {
                         ...msg,
                         chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n![Oluşturulan Görsel](${imgUrl})` : `![Oluşturulan Görsel](${imgUrl})`,
+                        imageGenPrompt: aiImagePrompt,
+                        imageGenStatus: "completed",
+                        imageGenUrl: imgUrl,
                         attachments: [...(msg.attachments || []), { kind: "image", name: "generated.png", data: imgUrl }]
                     };
                 }
@@ -1232,7 +1253,10 @@ export default function Index() {
                 if (msg === newMsg) {
                     return {
                         ...msg,
-                        chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n⚠️ Görsel oluşturulamadı: ${imgErr.message}` : `⚠️ Görsel oluşturulamadı: ${imgErr.message}`
+                        chat: msg.chat ? msg.chat.replace(/\n\n✨ Görseliniz özenle tasarlanıyor\.\.\./g, "") + `\n\n⚠️ Görsel oluşturulamadı: ${imgErr.message}` : `⚠️ Görsel oluşturulamadı: ${imgErr.message}`,
+                        imageGenPrompt: aiImagePrompt,
+                        imageGenStatus: "failed",
+                        imageGenError: imgErr.message,
                     };
                 }
                 return msg;

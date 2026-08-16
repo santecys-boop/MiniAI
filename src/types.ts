@@ -46,6 +46,10 @@ export type Msg = {
   effort?: "Low" | "Medium" | "Max Effort" | string;
   webSearchQuery?: string;
   webSearchSources?: { title: string; url: string; source: string; snippet?: string }[];
+  imageGenPrompt?: string;
+  imageGenStatus?: "generating" | "completed" | "failed";
+  imageGenUrl?: string;
+  imageGenError?: string;
 };
 
 export type LogEntry = {

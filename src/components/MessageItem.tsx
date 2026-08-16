@@ -13,6 +13,7 @@ import { injectAIBridge, exportProjectToZip, generateVirtualPreviewHtml } from "
 import { ProjectFileTree } from "./ProjectFileTree";
 import { DatabaseSchemaViewer } from "./DatabaseSchemaViewer";
 import { MultiFileSandboxPreview } from "./MultiFileSandboxPreview";
+import { GeminiImageGeneratorCard } from "./GeminiImageGeneratorCard";
 
 export type MessageItemProps = {
   message: Msg;
@@ -235,31 +236,30 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             </div>
           )}
 
-          {isGeneratingImg ? (
-            <div className="space-y-3 my-2 animate-fade-in">
-              <div className="flex items-center gap-2 text-stone-800 dark:text-stone-200 font-medium text-sm">
-                <span className="text-base">✨</span>
-                <span>{cleanChatText.replace(/\*\*/g, "").replace(/^✨\s*/, "")}</span>
-              </div>
-              <div className="w-full max-w-sm aspect-[4/3] rounded-3xl bg-neutral-200/90 dark:bg-neutral-800/90 animate-pulse border border-neutral-300/40 dark:border-neutral-700/40 shadow-sm" />
-            </div>
+          {m.imageGenStatus === "generating" || isGeneratingImg ? (
+            <GeminiImageGeneratorCard
+              prompt={m.imageGenPrompt || cleanChatText.replace(/^✨\s*/, "") || "Yapay zeka görseli"}
+              status="generating"
+            />
+          ) : m.imageGenStatus === "failed" ? (
+            <GeminiImageGeneratorCard
+              prompt={m.imageGenPrompt || cleanChatText || "Görsel"}
+              status="failed"
+              errorMessage={m.imageGenError}
+            />
           ) : imageUrl ? (
             <div className="space-y-2 my-2 animate-fade-in">
-              {cleanChatText && (
+              {cleanChatText && !cleanChatText.includes("Oluşturulan Görsel") && !cleanChatText.includes("Görseliniz") && (
                 <div className="whitespace-pre-wrap leading-relaxed text-stone-800 dark:text-stone-200 text-[14.5px]">
                   {cleanChatText}
                 </div>
               )}
-              <div
-                onClick={() => onImageClick?.(imageUrl)}
-                className="relative max-w-sm w-full rounded-3xl overflow-hidden cursor-pointer border border-stone-200 dark:border-stone-800 shadow-md hover:opacity-95 active:scale-[0.99] transition-all group select-none"
-              >
-                <img
-                  src={imageUrl}
-                  alt="Görsel"
-                  className="w-full h-auto object-cover rounded-3xl pointer-events-none select-none"
-                />
-              </div>
+              <GeminiImageGeneratorCard
+                prompt={m.imageGenPrompt || cleanChatText || "Yapay Zeka Tasarımı"}
+                status="completed"
+                imageUrl={imageUrl}
+                onImageClick={onImageClick}
+              />
             </div>
           ) : (
             cleanChatText && (
