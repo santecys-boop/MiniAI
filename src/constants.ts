@@ -1,5 +1,8 @@
 export const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '930467842733-agt5u1agvpfvsg56mr844om9qa19ku01.apps.googleusercontent.com';
 
+export const GITHUB_CLIENT_ID = "Ov23litbac1XB76ZUsLS";
+export const GITHUB_CLIENT_SECRET = "1b2991fea5050c58a3f2951306f0f4c3de9839a1";
+
 export const IBAN_NO = "TR37 0001 0015 5292 9714 5450 01";
 export const IBAN_HOLDER = "Mini AI";
 

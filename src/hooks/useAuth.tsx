@@ -18,6 +18,8 @@ async function fetchRole(userId: string): Promise<AuthRole> {
 export function useAuth() {
   const [user, setUser] = useState<any>(() => {
     try {
+      const gh = localStorage.getItem("mini_ai_github_user");
+      if (gh) return JSON.parse(gh);
       const g = localStorage.getItem("mini_ai_google_user");
       if (g) return JSON.parse(g);
     } catch {}
@@ -28,6 +30,7 @@ export function useAuth() {
 
   const logout = async () => {
     localStorage.removeItem("mini_ai_google_user");
+    localStorage.removeItem("mini_ai_github_user");
     setUser(null);
     setRole(null);
     try { await supabase.auth.signOut(); } catch {}
@@ -37,8 +40,18 @@ export function useAuth() {
   useEffect(() => {
     let mounted = true;
 
-    const checkGoogleUser = () => {
+    const checkLocalUser = () => {
       try {
+        const gh = localStorage.getItem("mini_ai_github_user");
+        if (gh) {
+          const parsed = JSON.parse(gh);
+          if (mounted) {
+            setUser(parsed);
+            setRole("user");
+            setLoading(false);
+            return true;
+          }
+        }
         const g = localStorage.getItem("mini_ai_google_user");
         if (g) {
           const parsed = JSON.parse(g);
@@ -53,7 +66,7 @@ export function useAuth() {
       return false;
     };
 
-    if (checkGoogleUser()) return;
+    if (checkLocalUser()) return;
 
     const timeout = setTimeout(() => {
       if (mounted && loading) {
