@@ -937,45 +937,20 @@ export default function Index() {
       }
 
       const userName = user?.name || user?.user_metadata?.full_name || localStorage.getItem("mini_ai_user_name") || (isGuest ? "Misafir" : "");
-      const userMemory = localStorage.getItem("mini_ai_user_memory");
-      const pastProjectsSummary = historyList.slice(0, 6).map(h => `- "${h.prompt}"`).join("\n");
-
-      let enrichedSystemPrompt = `${AI_SYSTEM_PROMPT}
-
-### 👤 KULLANICI PROFİLİ VE GEÇMİŞ HAFIZA:
-- Kullanıcının İsmi: ${userName || "Kullanıcı"}
-- Karşındaki kullanıcının ismini BİLİYORSUN. Ona ismiyle samimi, sıcak ve doğal hitap et.
-- Geçmiş Konuşmaları / Projeleri:
-${pastProjectsSummary || "(Henüz yeni oturum)"}
-${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
-
-      if (isImageOnly) {
-        enrichedSystemPrompt += "\n\n[ÇOK KRİTİK TALİMAT - KESİNLİKLE UY!]: Kullanıcı bu mesajı özel 'Üret' (Görsel Üretim) butonuyla gönderdi. Bu bir görsel isteğidir! Kesinlikle kod yazma, kod kutusu açma veya [FILE:...] bloğu ekleme! KESİNLİKLE cevabının en başına [IMAGE_GEN] etiketini koyup İngilizce prompt yazmalısın. Örnek: [IMAGE_GEN]yazılacak prompt[/IMAGE_GEN]";
-      }
+      const systemPrompt = AI_SYSTEM_PROMPT;
 
       const textFiles = pendingAttachments.filter(a => a.kind === "file" && !/\.zip$/i.test(a.name));
-      const promptWithUser = userName ? `[Kullanıcı: ${userName}]\n${input}` : input;
-      let promptToSend = promptWithUser;
+      let promptToSend = input;
       if (textFiles.length > 0) {
-        const fileBlocks = textFiles.map(f => `[KULLANICININ YÜKLEDİĞİ DOSYA: ${f.name}]\n${f.data}\n[/KULLANICININ YÜKLEDİĞİ DOSYA]`).join("\n\n");
-        promptToSend += `\n\n${fileBlocks}\n\n[KRİTİK TALİMAT]: Yüklenen dosya(lar)ın içeriğini dikkatle analiz et. Kullanıcının sorusu veya isteği doğrultusunda tam içeriği oluştur ve [FILE:${textFiles[0].name}]...[/FILE] etiketiyle eksiksiz olarak çıktı ver.`;
-      } else if (!isImageOnly) {
-        const lowerInput = input.toLowerCase().trim();
-        const isExplicitSiteCreation = /(site yap|web sitesi|uygulama yap|uygulama kodla|panel yap|dashboard yap|tasarla|kodla|klonla|proje oluştur|sayfa yap|full stack|saas yap)/i.test(lowerInput) ||
-          (/^(site|web|uygulama|app|dashboard|panel|saas|portal|platform|oyun|landing)\b/i.test(lowerInput) && !lowerInput.includes("?"));
-
-        if (isExplicitSiteCreation) {
-          promptToSend += `\n\n[KRİTİK MİMARİ TALİMATI - KESİNLİKLE ÇOKLU DOSYA JSON YAP]:\nBu bir web/uygulama projesi isteğidir. Lovable standardında tam yığın çoklu dosya (src/App.jsx, src/components/Navbar.jsx, src/pages/Home.jsx, src/pages/Dashboard.jsx, src/index.css ve database.sql_queries) içeren geçerli tek bir JSON objesi döndür!`;
-        } else {
-          promptToSend += `\n\n[KRİTİK TALİMAT - SADECE DOĞAL SOHBET CEVABI VER]:\nKullanıcı yeni bir web sitesi veya yazılım projesi İSTEMİYOR! Kullanıcı seninle sohbet ediyor, soru soruyor, selam veriyor veya bilgi danışıyor.\nKESİNLİKLE JSON formatında kod, dosya listesi veya web sitesi ÜRETME!\nDoğrudan kullanıcıya hitaben samimi, sıcak, zeki, Türkçe bir sohbet metni yaz.`;
-        }
+        const fileBlocks = textFiles.map(f => `[DOSYA: ${f.name}]\n${f.data}\n[/DOSYA]`).join("\n\n");
+        promptToSend = `${fileBlocks}\n\n${input}`;
       }
 
       if (useAgent) {
         const r = await fetch(`${FN_BASE}/agent-mode`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({ prompt: promptToSend, systemPrompt: enrichedSystemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
+          body: JSON.stringify({ prompt: promptToSend, systemPrompt: systemPrompt, onlineCompilerKey: ONLINE_COMPILER_API_KEY }),
         });
         const data = await r.json();
         if (data.error) throw new Error(data.error);
@@ -991,7 +966,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
         // Doğrudan Çoklu Anahtarlı Yüksek Hızlı Motor (SiliconFlow 4 Key + LLM7 4 Key)
         try {
           const chatMsgs: AIMessage[] = [
-            { role: "system", content: enrichedSystemPrompt },
+            { role: "system", content: systemPrompt },
             ...aiHistory.map((h: any) => ({ role: h.role as "user" | "assistant", content: typeof h.content === "string" ? h.content : JSON.stringify(h.content) })),
             { role: "user", content: promptToSend }
           ];
@@ -1019,7 +994,7 @@ ${userMemory ? `\n[ÖZEL HAFIZA]:\n${userMemory}` : ""}`;
                 prompt: promptToSend, history: aiHistory, images: imgs,
                 attachedFile: file ? { name: file.name, content: file.data } : null,
                 preferredProvider: model,
-                systemPrompt: enrichedSystemPrompt,
+                systemPrompt: systemPrompt,
                 onlineCompilerKey: ONLINE_COMPILER_API_KEY,
                 ...(isFix ? { fixError: input, currentCode: code } : {}),
               }),
