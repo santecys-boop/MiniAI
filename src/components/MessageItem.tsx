@@ -86,6 +86,33 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
     }
   };
 
+  const renderRichChatContent = (rawText: string) => {
+    if (!rawText) return null;
+    const lines = rawText.split("\n");
+    return lines.map((line, idx) => {
+      const trimmed = line.trim();
+      // Action badge match: [📄 ...] or [F ...] or [📦 ...] or [🔍 ...] or [... >]
+      const badgeMatch = trimmed.match(/^\[([📄📦🔍📁F]\s*[^\]]+)\]$/i) || trimmed.match(/^\[([^\]]+>\s*)\]$/i);
+      if (badgeMatch) {
+        const badgeContent = badgeMatch[1].replace(/>\s*$/, "").trim();
+        const icon = badgeContent.startsWith("📦") ? "📦" : badgeContent.startsWith("🔍") ? "🔍" : "📄";
+        const cleanTitle = badgeContent.replace(/^[📄📦🔍📁F]\s*/, "");
+        return (
+          <div key={idx} className="my-2 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-stone-100 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700/80 text-xs font-medium text-stone-800 dark:text-stone-200 shadow-xs select-none">
+            <span className="text-xs">{icon}</span>
+            <span>{cleanTitle}</span>
+            <ChevronRight className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500 shrink-0 ml-0.5" />
+          </div>
+        );
+      }
+      return (
+        <div key={idx} className={trimmed === "" ? "h-2" : "leading-relaxed"}>
+          {line}
+        </div>
+      );
+    });
+  };
+
   if (m.role === "user") {
     return (
       <div className="flex justify-end animate-fade-in my-3 select-none">
@@ -236,8 +263,8 @@ export function MessageItem({ message: m, isStreaming, onImageClick }: MessageIt
             </div>
           ) : (
             cleanChatText && (
-              <div className="whitespace-pre-wrap leading-relaxed text-stone-800 dark:text-stone-200 text-[14.5px]">
-                {typedChat ? typedChat.replace(/<think>[\s\S]*?<\/think>/i, "").trim() : cleanChatText}
+              <div className="space-y-1 leading-relaxed text-stone-800 dark:text-stone-200 text-[14.5px]">
+                {renderRichChatContent(typedChat ? typedChat.replace(/<think>[\s\S]*?<\/think>/i, "").trim() : cleanChatText)}
                 {!isChatDone && (
                   <span className="inline-block w-2 h-4 bg-emerald-500 animate-pulse ml-0.5 align-middle rounded-sm shadow-xs" />
                 )}
