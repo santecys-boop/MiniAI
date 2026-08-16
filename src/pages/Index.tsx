@@ -1262,8 +1262,9 @@ export default function Index() {
   }
 
   function toggleMic() {
-    unlockAudioEngine();
-    setVoiceOpen(true);
+    toast.info("🎙️ Voice (Sesli Mod) şu anda geliştirilmektedir. Çok yakında aktif olacaktır!", {
+      duration: 3500,
+    });
   }
 
   function toggleMute() {
@@ -1840,12 +1841,18 @@ export default function Index() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-semibold text-stone-100">
               <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
-              Sistem ve Geliştirme Bildirimi
+              Mini AI Startup & Demo Sürüm Bildirimi
             </DialogTitle>
           </DialogHeader>
           <div className="mt-4 space-y-3 text-xs leading-relaxed text-stone-300">
             <p>
-              Bu bir yapay zekadır. 24 mühendis tarafından oluşturulmuştur bu bir demo sürümdür yapay zeka hata yapabilir arayüz de hatalar olabilir gelişen bir sürümdür ve yerli ve milli yapay zeka mini ai altyapısı kullanıyordur voice mode yavaşdır lütfen saygı gösteriniz. Demo sürüm için hesabınıza 3 günlük 500 kredi tanımlanmıştır.
+              Mini AI, aktif olarak geliştirilen bir yerli yapay zeka startup projesidir ve şu anda <strong>Demo Sürüm</strong> olarak hizmet vermektedir.
+            </p>
+            <p>
+              24 mühendislik altyapımız ile platform üzerinde bir çok özellik ve modül sürekli olarak geliştirilmektedir. Bu bir geliştirme ve test süreci olduğundan bazı arayüz veya servislerde güncellemeler devam etmektedir.
+            </p>
+            <p>
+              Demo sürümümüzü deneyimlemeniz için hesabınıza <strong>3 günlük 500 kredi</strong> hediye tanımlanmıştır.
             </p>
           </div>
           <div className="mt-6 flex justify-end">
