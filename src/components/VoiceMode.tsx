@@ -1348,67 +1348,15 @@ export default function VoiceMode({
     });
   }
 
-  /** Web Speech API ile yedek seslendirme (Supabase kredisi bittiğinde veya hata verdiğinde devreye girer) */
-  function speakWithWebSpeech(text: string, signal: AbortSignal): Promise<void> {
-    return new Promise((resolve) => {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-        resolve();
-        return;
-      }
-
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "tr-TR";
-      utterance.rate = Math.max(0.8, Math.min(1.5, Number(speedRef.current) || 1.0));
-      utterance.pitch = voiceRef.current === "nova" || voiceRef.current === "shimmer" ? 1.08 : 0.95;
-
-      const voices = window.speechSynthesis.getVoices();
-      const trVoice = voices.find((v) => v.lang.startsWith("tr") || v.lang.includes("tr"));
-      if (trVoice) utterance.voice = trVoice;
-
-      let timer: any = null;
-      const startPulse = () => {
-        timer = setInterval(() => {
-          if (signal.aborted) {
-            clearInterval(timer);
-            return;
-          }
-          smoothLevelRef.current = 0.25 + Math.random() * 0.45;
-          setLevel(smoothLevelRef.current);
-        }, 100);
-      };
-
-      const finish = () => {
-        if (timer) clearInterval(timer);
-        setLevel(0);
-        signal.removeEventListener("abort", onAbort);
-        resolve();
-      };
-
-      const onAbort = () => {
-        window.speechSynthesis.cancel();
-        finish();
-      };
-
-      signal.addEventListener("abort", onAbort);
-      utterance.onstart = startPulse;
-      utterance.onend = finish;
-      utterance.onerror = finish;
-
-      window.speechSynthesis.speak(utterance);
-    });
-  }
-
   /**
    * Metni seslendir; bitince onDone çağrılır.
-   * HIZ: Önce Supabase OpenAI TTS ile paralel denenir, hata durumunda Web Speech API ile canlı seslendirilir.
+   * OpenAI TTS motoru (tts-1 / Shimmer, Nova, Alloy, Echo, Onyx, Fable) ile seslendirilir.
    */
   async function speak(text: string, onDone: () => void) {
     const ac = new AbortController();
     abortRef.current = ac;
 
     const chunks = splitForTts(text);
-    let supabaseSuccess = false;
 
     try {
       /* Tüm parçaları paralel indir — sıra playback'te korunur */
@@ -1422,18 +1370,9 @@ export default function VoiceMode({
           return;
         }
         await playUrl(url, ac.signal);
-        supabaseSuccess = true;
       }
     } catch (err) {
-      console.warn("Supabase OpenAI TTS failed or out of credits, switching to Web Speech fallback...", err);
-    }
-
-    if (!supabaseSuccess && !closedRef.current && !ac.signal.aborted) {
-      try {
-        await speakWithWebSpeech(text, ac.signal);
-      } catch (wsErr) {
-        console.warn("Web speech fallback error:", wsErr);
-      }
+      console.warn("OpenAI TTS playback error:", err);
     }
 
     if (!closedRef.current && !ac.signal.aborted) onDone();
